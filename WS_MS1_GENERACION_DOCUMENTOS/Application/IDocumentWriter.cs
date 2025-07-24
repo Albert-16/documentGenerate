@@ -8,7 +8,10 @@ namespace Application
 {
     public interface IDocumentWriter
     {
-        string SaveTxt(string content, string basePath);
+      //  string SaveTxt(string content, string basePath);
+
+        string GenerarPolizaPdf(string rutaDestino);
+
     }
 }
 // This interface defines a contract for saving text documents.

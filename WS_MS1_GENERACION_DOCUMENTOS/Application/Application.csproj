@@ -41,7 +41,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GenerateTxtUseCase.cs" />
+    <Compile Include="GeneratePdfUseCase.cs" />
     <Compile Include="IDocumentWriter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
