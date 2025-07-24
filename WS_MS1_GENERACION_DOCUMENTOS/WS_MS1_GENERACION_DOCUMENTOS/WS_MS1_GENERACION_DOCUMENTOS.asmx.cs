@@ -24,6 +24,7 @@ namespace WS_MS1_GENERACION_DOCUMENTOS
         {
             try
             {
+                //Prepara el directorio base para guardar el archivo
                 string basePath = Server.MapPath("~/TempFiles/");
 
                 // Instanciar el writer desde infraestructura
