@@ -1,0 +1,68 @@
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
+using MigraDoc.DocumentObjectModel.Shapes;
+
+// Dentro de tu clase ContratoPdfGeneratorRepositorie
+private void AgregarBloqueFirmas(
+    Section sec,
+    string cif,
+    DateTime fechaHora,
+    string etiquetaBanco   = "El Banco",
+    string etiquetaCliente = "Aceptado Digitalmente\nEl Cliente",
+    string rutaImagenFirma = null,            // opcional: path a la imagen de la firma
+    double anchoFirmaCm    = 2.5              // ancho deseado de la imagen
+)
+{
+    // Tabla contenedora (3 columnas)
+    var t = sec.AddTable();
+    t.Borders.Width = 0;                      // sin bordes visibles
+    t.AddColumn(Unit.FromCentimeter(7.5));    // firma banco
+    t.AddColumn(Unit.FromCentimeter(2.5));    // firma imagen/espacio
+    t.AddColumn(Unit.FromCentimeter(7.5));    // firma cliente + datos
+
+    var r = t.AddRow();
+    r.TopPadding = "0.2cm";
+    r.BottomPadding = "0.2cm";
+    r.VerticalAlignment = VerticalAlignment.Center;
+
+    // -------- Columna izquierda: línea + etiqueta banco --------
+    var pLineaBanco = r.Cells[0].AddParagraph();
+    pLineaBanco.Format.SpaceBefore = "1.2cm";                 // altura donde irá la línea
+    pLineaBanco.Format.Borders.Bottom.Width = 0.5;            // grosor de la línea
+    pLineaBanco.Format.Borders.Bottom.Color = Colors.Gray;
+    pLineaBanco.Format.SpaceAfter = "0.15cm";
+
+    var pEtiquetaBanco = r.Cells[0].AddParagraph(etiquetaBanco);
+    pEtiquetaBanco.Format.Alignment = ParagraphAlignment.Center;
+    pEtiquetaBanco.Format.Font.Size = 11;
+
+    // -------- Columna central: imagen de firma (opcional) --------
+    if (!string.IsNullOrWhiteSpace(rutaImagenFirma))
+    {
+        var img = r.Cells[1].AddImage(rutaImagenFirma);
+        img.LockAspectRatio = true;
+        img.Width = Unit.FromCentimeter(anchoFirmaCm);
+        img.Top   = ShapePosition.Center;
+        img.Left  = ShapePosition.Center;
+    }
+
+    // -------- Columna derecha: línea + etiqueta cliente + datos --------
+    var pLineaCliente = r.Cells[2].AddParagraph();
+    pLineaCliente.Format.SpaceBefore = "1.2cm";
+    pLineaCliente.Format.Borders.Bottom.Width = 0.5;
+    pLineaCliente.Format.Borders.Bottom.Color = Colors.Gray;
+    pLineaCliente.Format.SpaceAfter = "0.15cm";
+
+    var pEtiquetaCliente = r.Cells[2].AddParagraph(etiquetaCliente);
+    pEtiquetaCliente.Format.Alignment = ParagraphAlignment.Center;
+    pEtiquetaCliente.Format.Font.Size = 11;
+
+    var pDatos = r.Cells[2].AddParagraph();
+    pDatos.Format.SpaceBefore = "0.25cm";
+    pDatos.Format.Alignment = ParagraphAlignment.Left;
+    pDatos.AddFormattedText("N° de CIF: ", TextFormat.Bold);
+    pDatos.AddText(string.IsNullOrWhiteSpace(cif) ? "—" : cif);
+    pDatos.AddLineBreak();
+    pDatos.AddFormattedText("Fecha y hora: ", TextFormat.Bold);
+    pDatos.AddText(fechaHora.ToString("dd/MM/yyyy HH:mm"));
+}
