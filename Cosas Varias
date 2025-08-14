@@ -1,33 +1,56 @@
-private void AgregarBloqueFirmas(Section sec, string cif, DateTime fechaHora, string etiquetaBanco, string firmaClienteTextoArriba, string etiquetaCliente, string rutaImagenFirma = null, double anchoFirmaCm = 2.5)
+
+// using MigraDoc.DocumentObjectModel;
+
+private void AgregarBloqueCifFecha(
+    Section sec,
+    string cif,
+    DateTime fechaHora,
+    ParagraphAlignment alineacion = ParagraphAlignment.Right,
+    string etiquetaCif = "N° de CIF:",
+    string etiquetaFecha = "Fecha y hora:",
+    string spaceAfter = "0.4cm")
 {
-    var tabla = sec.AddTable();
-    tabla.Borders.Visible = false;
-    tabla.AddColumn(Unit.FromCentimeter(8)); // Columna banco
-    tabla.AddColumn(Unit.FromCentimeter(8)); // Columna cliente
+    var p = sec.AddParagraph();
+    p.Format.Alignment = alineacion;
+    p.Format.SpaceAfter = spaceAfter;
+    p.Format.Font.Size = 11;
 
-    var filaInfo = tabla.AddRow();
-    filaInfo.Format.Alignment = ParagraphAlignment.Right;
-    filaInfo.Cells[0].AddParagraph(""); // vacío en banco
-    filaInfo.Cells[1].AddParagraph($"N° de CIF: {cif}");
-    filaInfo.Cells[1].AddParagraph($"Fecha y hora: {fechaHora:dd/MM/yyyy HH:mm}");
-
-    var filaFirma = tabla.AddRow();
-    filaFirma.VerticalAlignment = VerticalAlignment.Center;
-
-    // Columna Banco
-    var pBancoLinea = filaFirma.Cells[0].AddParagraph();
-    pBancoLinea.AddLineBreak();
-    pBancoLinea.AddText("____________________________");
-    pBancoLinea.Format.Alignment = ParagraphAlignment.Center;
-    filaFirma.Cells[0].AddParagraph(etiquetaBanco).Format.Alignment = ParagraphAlignment.Center;
-
-    // Columna Cliente
-    var pClienteArriba = filaFirma.Cells[1].AddParagraph(firmaClienteTextoArriba);
-    pClienteArriba.Format.Alignment = ParagraphAlignment.Center;
-
-    var pClienteLinea = filaFirma.Cells[1].AddParagraph("____________________________");
-    pClienteLinea.Format.Alignment = ParagraphAlignment.Center;
-
-    var pClienteAbajo = filaFirma.Cells[1].AddParagraph(etiquetaCliente);
-    pClienteAbajo.Format.Alignment = ParagraphAlignment.Center;
+    p.AddFormattedText(etiquetaCif + " ", TextFormat.Bold);
+    p.AddText(string.IsNullOrWhiteSpace(cif) ? "—" : cif);
+    p.AddLineBreak();
+    p.AddFormattedText(etiquetaFecha + " ", TextFormat.Bold);
+    p.AddText(fechaHora.ToString("dd/MM/yyyy HH:mm"));
 }
+
+
+
+
+// using MigraDoc.DocumentObjectModel;
+
+private void AgregarBloqueCifFecha(
+    Section sec,
+    string cif,
+    DateTime fechaHora,
+    ParagraphAlignment alineacion = ParagraphAlignment.Right,
+    string etiquetaCif = "N° de CIF:",
+    string etiquetaFecha = "Fecha y hora:",
+    string spaceAfter = "0.4cm")
+{
+    var p = sec.AddParagraph();
+    p.Format.Alignment = alineacion;
+    p.Format.SpaceAfter = spaceAfter;
+    p.Format.Font.Size = 11;
+
+    p.AddFormattedText(etiquetaCif + " ", TextFormat.Bold);
+    p.AddText(string.IsNullOrWhiteSpace(cif) ? "—" : cif);
+    p.AddLineBreak();
+    p.AddFormattedText(etiquetaFecha + " ", TextFormat.Bold);
+    p.AddText(fechaHora.ToString("dd/MM/yyyy HH:mm"));
+}
+
+
+
+
+
+
+
