@@ -1,32 +1,103 @@
+using System.IO;
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
+using MigraDoc.DocumentObjectModel.Shapes;
 
-// Tabla de firmas
-Table tablaFirmas = section.AddTable();
-tablaFirmas.Borders.Visible = false;
-tablaFirmas.AddColumn(Unit.FromCentimeter(7)); // Columna Banco
-tablaFirmas.AddColumn(Unit.FromCentimeter(7)); // Columna Cliente
-
-Row filaFirmas = tablaFirmas.AddRow();
-filaFirmas.TopPadding = Unit.FromCentimeter(1.5); // Espacio antes de la línea
-
-// Celda Banco
-Paragraph banco = filaFirmas.Cells[0].AddParagraph();
-banco.Format.Alignment = ParagraphAlignment.Center;
-
-// Si hay firma imagen
-if (!string.IsNullOrEmpty(rutaFirmaBanco) && File.Exists(rutaFirmaBanco))
+/// <summary>
+/// Agrega un bloque de DOS firmas (Banco / Cliente) en dos columnas bien alineadas.
+/// - Columna izquierda: línea de firma con texto "El Banco" debajo y, opcionalmente, una imagen de firma arriba.
+/// - Columna derecha: texto "Aceptado Digitalmente" sobre la línea, y "El Cliente" debajo.
+/// </summary>
+/// <param name="sec">Sección destino.</param>
+/// <param name="etiquetaBanco">Texto debajo de la línea del banco (por defecto "El Banco").</param>
+/// <param name="etiquetaCliente">Texto debajo de la línea del cliente (por defecto "El Cliente").</param>
+/// <param name="textoSobreLineaCliente">Texto sobre la línea del cliente (por defecto "Aceptado Digitalmente").</param>
+/// <param name="rutaFirmaBanco">Ruta opcional a la imagen de firma del banco (centrada sobre la línea).</param>
+/// <param name="anchoFirmaCm">Ancho de la imagen de firma (si se usa).</param>
+/// <param name="anchoColumnaCm">Ancho de cada columna.</param>
+/// <param name="espacioAntesCm">Aire antes del bloque (arriba).</param>
+/// <param name="espacioDespuesCm">Aire después del bloque (abajo).</param>
+/// <param name="grosorLineaPt">Grosor de la línea de firma.</param>
+/// <param name="tamFuente">Tamaño de fuente para textos de este bloque.</param>
+public static void AgregarFirmasDosColumnas(
+    Section sec,
+    string etiquetaBanco = "El Banco",
+    string etiquetaCliente = "El Cliente",
+    string textoSobreLineaCliente = "Aceptado Digitalmente",
+    string rutaFirmaBanco = null,
+    double anchoFirmaCm = 3.0,
+    double anchoColumnaCm = 7.5,
+    double espacioAntesCm = 0.4,
+    double espacioDespuesCm = 0.4,
+    double grosorLineaPt = 0.5,
+    double tamFuente = 11
+)
 {
-    var img = filaFirmas.Cells[0].AddImage(rutaFirmaBanco);
-    img.LockAspectRatio = true;
-    img.Width = Unit.FromCentimeter(3);
-    filaFirmas.Cells[0].AddParagraph().AddLineBreak();
+    // — Espacio superior
+    if (espacioAntesCm > 0)
+    {
+        var padTop = sec.AddParagraph();
+        padTop.Format.SpaceBefore = $"{espacioAntesCm}cm";
+    }
+
+    // — Tabla contenedora 2 columnas (Banco | Cliente)
+    var tabla = sec.AddTable();
+    tabla.Borders.Width = 0;
+    tabla.AddColumn(Unit.FromCentimeter(anchoColumnaCm)); // Banco
+    tabla.AddColumn(Unit.FromCentimeter(anchoColumnaCm)); // Cliente
+
+    var fila = tabla.AddRow();
+    fila.TopPadding = "0.2cm";
+    fila.BottomPadding = "0.2cm";
+    fila.VerticalAlignment = VerticalAlignment.Top;
+
+    // ===== Columna IZQUIERDA (Banco) =====
+    // (1) Imagen de firma (opcional)
+    if (!string.IsNullOrWhiteSpace(rutaFirmaBanco) && File.Exists(rutaFirmaBanco))
+    {
+        var img = fila.Cells[0].AddImage(rutaFirmaBanco);
+        img.LockAspectRatio = true;
+        img.Width = Unit.FromCentimeter(anchoFirmaCm);
+        img.Top = ShapePosition.Top;
+        img.Left = ShapePosition.Center;
+        fila.Cells[0].AddParagraph().Format.SpaceBefore = "0.2cm";
+    }
+
+    // (2) Línea de firma (borde inferior del párrafo)
+    var pLineaBanco = fila.Cells[0].AddParagraph();
+    pLineaBanco.Format.Borders.Bottom.Width = grosorLineaPt;
+    pLineaBanco.Format.Borders.Bottom.Color = Colors.Gray;
+    pLineaBanco.Format.SpaceAfter = "0.15cm";
+    pLineaBanco.Format.Alignment = ParagraphAlignment.Center;
+
+    // (3) Etiqueta debajo
+    var pBanco = fila.Cells[0].AddParagraph(etiquetaBanco);
+    pBanco.Format.Alignment = ParagraphAlignment.Center;
+    pBanco.Format.Font.Size = tamFuente;
+
+    // ===== Columna DERECHA (Cliente) =====
+    // (1) Texto sobre la línea (firma digital)
+    var pArriba = fila.Cells[1].AddParagraph(textoSobreLineaCliente);
+    pArriba.Format.Alignment = ParagraphAlignment.Center;
+    pArriba.Format.Font.Size = tamFuente;
+    pArriba.Format.SpaceAfter = "0.2cm";
+
+    // (2) Línea de firma
+    var pLineaCliente = fila.Cells[1].AddParagraph();
+    pLineaCliente.Format.Borders.Bottom.Width = grosorLineaPt;
+    pLineaCliente.Format.Borders.Bottom.Color = Colors.Gray;
+    pLineaCliente.Format.SpaceAfter = "0.15cm";
+    pLineaCliente.Format.Alignment = ParagraphAlignment.Center;
+
+    // (3) Etiqueta debajo
+    var pCliente = fila.Cells[1].AddParagraph(etiquetaCliente);
+    pCliente.Format.Alignment = ParagraphAlignment.Center;
+    pCliente.Format.Font.Size = tamFuente;
+
+    // — Espacio inferior
+    if (espacioDespuesCm > 0)
+    {
+        var padBottom = sec.AddParagraph();
+        padBottom.Format.SpaceBefore = $"{espacioDespuesCm}cm";
+    }
 }
-
-filaFirmas.Cells[0].AddParagraph("____________________________").Format.Alignment = ParagraphAlignment.Center;
-filaFirmas.Cells[0].AddParagraph("El Banco").Format.Alignment = ParagraphAlignment.Center;
-
-// Celda Cliente
-Paragraph cliente = filaFirmas.Cells[1].AddParagraph();
-cliente.Format.Alignment = ParagraphAlignment.Center;
-filaFirmas.Cells[1].AddParagraph("Aceptado Digitalmente").Format.Alignment = ParagraphAlignment.Center;
-filaFirmas.Cells[1].AddParagraph("____________________________").Format.Alignment = ParagraphAlignment.Center;
-filaFirmas.Cells[1].AddParagraph("El Cliente").Format.Alignment = ParagraphAlignment.Center;
