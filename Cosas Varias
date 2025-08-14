@@ -2,6 +2,9 @@ using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.DocumentObjectModel.Shapes;
 
+// Conversión segura a centímetros (funciona en todas las versiones de MigraDoc)
+private static double Cm(Unit u) => u / Unit.FromCentimeter(1);
+
 private void AgregarBloqueFirmasDosColumnasV2(
     Section sec,
     string etiquetaBanco = "El Banco",
@@ -11,18 +14,22 @@ private void AgregarBloqueFirmasDosColumnasV2(
     string rutaFirmaCliente = null,        // opcional
     double anchoFirmaCm = 2.5,
     double separadorCentralCm = 1.0,       // columna separadora
-    double alturaAntesDeLineaCm = 1.2,     // **controla dónde cae la línea**
+    double alturaAntesDeLineaCm = 1.2,     // controla dónde cae la línea (mismo valor a ambos lados)
     double grosorLineaPt = 0.5,
     double tamFuente = 11
 )
 {
+    // ----- Ancho útil (página - márgenes), todo en cm -----
+    var anchoUtilCm = Cm(sec.PageSetup.PageWidth - sec.PageSetup.LeftMargin - sec.PageSetup.RightMargin);
+    var colWidthCm  = (anchoUtilCm - separadorCentralCm) / 2.0;
+
     // ----- Tabla principal: [Banco] [Separador] [Cliente] -----
     var t = sec.AddTable();
     t.Borders.Width = 0;
 
-    var colIzq  = t.AddColumn(Unit.FromCentimeter( (sec.PageSetup.PageWidth - sec.PageSetup.LeftMargin - sec.PageSetup.RightMargin).Centimeter / 2.0 - separadorCentralCm/2.0 ));
-    var colSep  = t.AddColumn(Unit.FromCentimeter(separadorCentralCm));
-    var colDer  = t.AddColumn(Unit.FromCentimeter( (sec.PageSetup.PageWidth - sec.PageSetup.LeftMargin - sec.PageSetup.RightMargin).Centimeter / 2.0 - separadorCentralCm/2.0 ));
+    var colIzq = t.AddColumn(Unit.FromCentimeter(colWidthCm));
+    var colSep = t.AddColumn(Unit.FromCentimeter(separadorCentralCm));
+    var colDer = t.AddColumn(Unit.FromCentimeter(colWidthCm));
 
     var row = t.AddRow();
     row.TopPadding = "0.2cm";
@@ -32,15 +39,14 @@ private void AgregarBloqueFirmasDosColumnasV2(
     // ========= LADO BANCO (tabla anidada) =========
     var bank = row.Cells[0].Elements.AddTable() as Table;
     bank.Borders.Width = 0;
-    bank.AddColumn(Unit.FromCentimeter(colIzq.Width.Centimeter));
+    bank.AddColumn(Unit.FromCentimeter(colWidthCm));
 
-    // Fila 0: espacio superior (altura fija)
+    // Fila 0: espacio superior (altura fija). Si hay imagen, queda pegada abajo.
     var b0 = bank.AddRow();
     b0.Height = Unit.FromCentimeter(alturaAntesDeLineaCm);
     b0.HeightRule = RowHeightRule.Exactly;
     b0.VerticalAlignment = VerticalAlignment.Bottom;
 
-    // Si hay imagen de firma del banco, la ponemos aquí (pegada abajo)
     if (!string.IsNullOrWhiteSpace(rutaFirmaBanco))
     {
         var pImg = b0.Cells[0].AddParagraph();
@@ -48,16 +54,13 @@ private void AgregarBloqueFirmasDosColumnasV2(
         imgB.LockAspectRatio = true;
         imgB.Width = Unit.FromCentimeter(anchoFirmaCm);
         pImg.Format.Alignment = ParagraphAlignment.Center;
-        pImg.Format.SpaceBefore = 0;
-        pImg.Format.SpaceAfter = 0;
     }
 
-    // Fila 1: línea de firma (borde inferior del párrafo)
+    // Fila 1: línea de firma
     var b1 = bank.AddRow();
     var pLineaBanco = b1.Cells[0].AddParagraph();
     pLineaBanco.Format.Borders.Bottom.Width = grosorLineaPt;
     pLineaBanco.Format.Borders.Bottom.Color = Colors.Gray;
-    pLineaBanco.Format.SpaceBefore = 0;
     pLineaBanco.Format.SpaceAfter = "0.15cm";
 
     // Fila 2: etiqueta bajo la línea
@@ -65,18 +68,16 @@ private void AgregarBloqueFirmasDosColumnasV2(
     var pBanco = b2.Cells[0].AddParagraph(etiquetaBanco);
     pBanco.Format.Alignment = ParagraphAlignment.Center;
     pBanco.Format.Font.Size = tamFuente;
-    pBanco.Format.SpaceBefore = 0;
-    pBanco.Format.SpaceAfter = 0;
 
     // ========= SEPARADOR CENTRAL =========
-    row.Cells[1].AddParagraph(); // vacío a modo de “aire”
+    row.Cells[1].AddParagraph(); // aire
 
     // ========= LADO CLIENTE (tabla anidada) =========
     var cli = row.Cells[2].Elements.AddTable() as Table;
     cli.Borders.Width = 0;
-    cli.AddColumn(Unit.FromCentimeter(colDer.Width.Centimeter));
+    cli.AddColumn(Unit.FromCentimeter(colWidthCm));
 
-    // Fila 0: espacio superior (altura fija) con el texto “firma” ABAJO
+    // Fila 0: espacio superior con el texto “firma” abajo
     var c0 = cli.AddRow();
     c0.Height = Unit.FromCentimeter(alturaAntesDeLineaCm);
     c0.HeightRule = RowHeightRule.Exactly;
@@ -85,17 +86,14 @@ private void AgregarBloqueFirmasDosColumnasV2(
     var pArriba = c0.Cells[0].AddParagraph(textoFirmaClienteArriba);
     pArriba.Format.Alignment = ParagraphAlignment.Center;
     pArriba.Format.Font.Size = tamFuente;
-    pArriba.Format.SpaceBefore = 0;
-    pArriba.Format.SpaceAfter = 0;
 
-    // Si tuvieras imagen de firma del cliente, también puedes ponerla aquí:
     if (!string.IsNullOrWhiteSpace(rutaFirmaCliente))
     {
-        var imgP = c0.Cells[0].AddImage(rutaFirmaCliente);
-        imgP.LockAspectRatio = true;
-        imgP.Width = Unit.FromCentimeter(anchoFirmaCm);
-        imgP.Top = ShapePosition.Bottom;
-        imgP.Left = ShapePosition.Center;
+        var imgC = c0.Cells[0].AddImage(rutaFirmaCliente);
+        imgC.LockAspectRatio = true;
+        imgC.Width = Unit.FromCentimeter(anchoFirmaCm);
+        imgC.Top = ShapePosition.Bottom;
+        imgC.Left = ShapePosition.Center;
     }
 
     // Fila 1: línea de firma
@@ -103,7 +101,6 @@ private void AgregarBloqueFirmasDosColumnasV2(
     var pLineaCli = c1.Cells[0].AddParagraph();
     pLineaCli.Format.Borders.Bottom.Width = grosorLineaPt;
     pLineaCli.Format.Borders.Bottom.Color = Colors.Gray;
-    pLineaCli.Format.SpaceBefore = 0;
     pLineaCli.Format.SpaceAfter = "0.15cm";
 
     // Fila 2: etiqueta bajo la línea
@@ -111,6 +108,4 @@ private void AgregarBloqueFirmasDosColumnasV2(
     var pCliente = c2.Cells[0].AddParagraph(etiquetaClienteAbajo);
     pCliente.Format.Alignment = ParagraphAlignment.Center;
     pCliente.Format.Font.Size = tamFuente;
-    pCliente.Format.SpaceBefore = 0;
-    pCliente.Format.SpaceAfter = 0;
 }
