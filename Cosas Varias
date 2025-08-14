@@ -1,63 +1,33 @@
-private void AgregarBloqueFirmas(
-    Section sec,
-    string cif,
-    DateTime fechaHora,
-    string etiquetaBanco   = "El Banco",
-    string etiquetaCliente = "Aceptado Digitalmente\nEl Cliente",
-    string rutaImagenFirma = null,
-    double anchoFirmaCm    = 2.5
-)
+private void AgregarBloqueFirmas(Section sec, string cif, DateTime fechaHora, string etiquetaBanco, string firmaClienteTextoArriba, string etiquetaCliente, string rutaImagenFirma = null, double anchoFirmaCm = 2.5)
 {
-    var t = sec.AddTable();
-    t.Borders.Width = 0;
-    t.AddColumn(Unit.FromCentimeter(7.5));    // Banco
-    t.AddColumn(Unit.FromCentimeter(2.5));    // firma o espacio
-    t.AddColumn(Unit.FromCentimeter(7.5));    // Cliente
+    var tabla = sec.AddTable();
+    tabla.Borders.Visible = false;
+    tabla.AddColumn(Unit.FromCentimeter(8)); // Columna banco
+    tabla.AddColumn(Unit.FromCentimeter(8)); // Columna cliente
 
-    var r = t.AddRow();
-    r.TopPadding = "0.2cm";
-    r.BottomPadding = "0.2cm";
-    r.VerticalAlignment = VerticalAlignment.Center;
+    var filaInfo = tabla.AddRow();
+    filaInfo.Format.Alignment = ParagraphAlignment.Right;
+    filaInfo.Cells[0].AddParagraph(""); // vacío en banco
+    filaInfo.Cells[1].AddParagraph($"N° de CIF: {cif}");
+    filaInfo.Cells[1].AddParagraph($"Fecha y hora: {fechaHora:dd/MM/yyyy HH:mm}");
 
-    // -------- Columna izquierda --------
-    var pLineaBanco = r.Cells[0].AddParagraph();
-    pLineaBanco.Format.SpaceBefore = "1.2cm";
-    pLineaBanco.Format.Borders.Bottom.Width = 0.5;
-    pLineaBanco.Format.Borders.Bottom.Color = Colors.Gray;
-    pLineaBanco.Format.SpaceAfter = "0.15cm";
+    var filaFirma = tabla.AddRow();
+    filaFirma.VerticalAlignment = VerticalAlignment.Center;
 
-    var pEtiquetaBanco = r.Cells[0].AddParagraph(etiquetaBanco);
-    pEtiquetaBanco.Format.Alignment = ParagraphAlignment.Center;
-    pEtiquetaBanco.Format.Font.Size = 11;
+    // Columna Banco
+    var pBancoLinea = filaFirma.Cells[0].AddParagraph();
+    pBancoLinea.AddLineBreak();
+    pBancoLinea.AddText("____________________________");
+    pBancoLinea.Format.Alignment = ParagraphAlignment.Center;
+    filaFirma.Cells[0].AddParagraph(etiquetaBanco).Format.Alignment = ParagraphAlignment.Center;
 
-    // -------- Columna central (firma) --------
-    if (!string.IsNullOrWhiteSpace(rutaImagenFirma))
-    {
-        var img = r.Cells[1].AddImage(rutaImagenFirma);
-        img.LockAspectRatio = true;
-        img.Width = Unit.FromCentimeter(anchoFirmaCm);
-        img.Top   = ShapePosition.Center;
-        img.Left  = ShapePosition.Center;
-    }
+    // Columna Cliente
+    var pClienteArriba = filaFirma.Cells[1].AddParagraph(firmaClienteTextoArriba);
+    pClienteArriba.Format.Alignment = ParagraphAlignment.Center;
 
-    // -------- Columna derecha --------
-    // 1) Primero los datos
-    var pDatos = r.Cells[2].AddParagraph();
-    pDatos.AddFormattedText("N° de CIF: ", TextFormat.Bold);
-    pDatos.AddText(string.IsNullOrWhiteSpace(cif) ? "—" : cif);
-    pDatos.AddLineBreak();
-    pDatos.AddFormattedText("Fecha y hora: ", TextFormat.Bold);
-    pDatos.AddText(fechaHora.ToString("dd/MM/yyyy HH:mm"));
-    pDatos.Format.Alignment = ParagraphAlignment.Left;
-    pDatos.Format.SpaceAfter = "0.4cm"; // separación antes de la línea
+    var pClienteLinea = filaFirma.Cells[1].AddParagraph("____________________________");
+    pClienteLinea.Format.Alignment = ParagraphAlignment.Center;
 
-    // 2) Luego la línea y texto de cliente
-    var pLineaCliente = r.Cells[2].AddParagraph();
-    pLineaCliente.Format.Borders.Bottom.Width = 0.5;
-    pLineaCliente.Format.Borders.Bottom.Color = Colors.Gray;
-    pLineaCliente.Format.SpaceAfter = "0.15cm";
-
-    var pEtiquetaCliente = r.Cells[2].AddParagraph(etiquetaCliente);
-    pEtiquetaCliente.Format.Alignment = ParagraphAlignment.Center;
-    pEtiquetaCliente.Format.Font.Size = 11;
+    var pClienteAbajo = filaFirma.Cells[1].AddParagraph(etiquetaCliente);
+    pClienteAbajo.Format.Alignment = ParagraphAlignment.Center;
 }
