@@ -6,81 +6,41 @@ public static void AgregarBloqueFirmasDoble(
     string rutaImagenFirmaBanco,
     double separacionCm = 1.0,
     double altoFilaContenidoCm = 1.8,
-    double anchoImagenCm = 4.5)
+    double anchoImagenCm = 4.5,
+    double anchoBloqueTotalCm = 0 // 0 = usar todo el ancho útil (página - márgenes)
+)
 {
     if (section == null) throw new ArgumentNullException(nameof(section));
 
-    var anchoContenido = section.PageSetup.PageWidth - section.PageSetup.LeftMargin - section.PageSetup.RightMargin;
-    var colEspaciadora = Unit.FromCentimeter(separacionCm);
-    var colFirma = (anchoContenido - colEspaciadora) / 2;
+    // Ancho útil de la página
+    Unit anchoUtilPagina = section.PageSetup.PageWidth - section.PageSetup.LeftMargin - section.PageSetup.RightMargin;
 
+    // Ancho del bloque (puede ser menor al útil para que no ocupe todo el ancho)
+    Unit anchoBloque = anchoBloqueTotalCm > 0
+        ? Unit.FromCentimeter(anchoBloqueTotalCm)
+        : anchoUtilPagina;
+
+    // Columnas: [Firma IZQ][Espaciador][Firma DER]
+    Unit colEspaciadora = Unit.FromCentimeter(separacionCm);
+    if (colEspaciadora > anchoBloque) colEspaciadora = anchoBloque / 10; // salvaguarda
+    Unit colFirma = (anchoBloque - colEspaciadora) / 2;
+
+    // Tabla
     var tabla = section.AddTable();
-    tabla.Format.Alignment = ParagraphAlignment.Center;
     tabla.Borders.Width = 0;
     tabla.TopPadding = 0;
     tabla.BottomPadding = 0;
     tabla.LeftPadding = 0;
     tabla.RightPadding = 0;
+    tabla.Format.SpaceBefore = Unit.FromCentimeter(0.4);
+    tabla.Format.SpaceAfter = Unit.FromCentimeter(0.4);
+    tabla.Format.Alignment = ParagraphAlignment.Center; // centra contenido de párrafos
 
     tabla.AddColumn(colFirma);
     tabla.AddColumn(colEspaciadora);
     tabla.AddColumn(colFirma);
 
-    // Fila 1: contenido (imagen izq / texto der)
-    var filaContenido = tabla.AddRow();
-    filaContenido.HeightRule = RowHeightRule.Exactly;
-    filaContenido.Height = Unit.FromCentimeter(altoFilaContenidoCm);
-    filaContenido.VerticalAlignment = VerticalAlignment.Bottom;
+    // Centrar la tabla dentro del ancho útil
+    tabla.Rows.LeftIndent = (anchoUtilPagina - anchoBloque) / 2;
 
-    var pImg = filaContenido.Cells[0].AddParagraph();
-    pImg.Format.Alignment = ParagraphAlignment.Center;
-    try
-    {
-        var img = pImg.AddImage(rutaImagenFirmaBanco);
-        img.LockAspectRatio = true;
-        img.Width = Unit.FromCentimeter(anchoImagenCm);
-    }
-    catch
-    {
-        pImg.AddFormattedText("[Firma del Banco]");
-    }
-
-    filaContenido.Cells[1].AddParagraph("");
-
-    var pTextoDer = filaContenido.Cells[2].AddParagraph("Aceptado Digitalmente");
-    pTextoDer.Format.Alignment = ParagraphAlignment.Center;
-    pTextoDer.Format.Font.Bold = true;
-
-    // Fila 2: líneas
-    var filaLinea = tabla.AddRow();
-    filaLinea.HeightRule = RowHeightRule.Exactly;
-    filaLinea.Height = Unit.FromCentimeter(0.6);
-    filaLinea.VerticalAlignment = VerticalAlignment.Bottom;
-
-    filaLinea.Cells[0].Borders.Bottom.Width = 1;
-    filaLinea.Cells[0].Borders.Bottom.Color = Colors.Black;
-
-    filaLinea.Cells[1].AddParagraph("");
-
-    filaLinea.Cells[2].Borders.Bottom.Width = 1;
-    filaLinea.Cells[2].Borders.Bottom.Color = Colors.Black;
-
-    // Fila 3: etiquetas
-    var filaEtiquetas = tabla.AddRow();
-    filaEtiquetas.HeightRule = RowHeightRule.AtLeast;
-    filaEtiquetas.Height = Unit.FromCentimeter(0.8);
-
-    var pBanco = filaEtiquetas.Cells[0].AddParagraph("El Banco");
-    pBanco.Format.Alignment = ParagraphAlignment.Center;
-    pBanco.Format.Font.Size = 9;
-
-    filaEtiquetas.Cells[1].AddParagraph("");
-
-    var pCliente = filaEtiquetas.Cells[2].AddParagraph("El Cliente");
-    pCliente.Format.Alignment = ParagraphAlignment.Center;
-    pCliente.Format.Font.Size = 9;
-
-    tabla.Rows.LeftIndent = 0;
-    tabla.Format.SpaceBefore = Unit.FromCentimeter(0.4);
-    tabla.Format.SpaceAfter = Unit.FromCentimeter(0.4);
-}
+    // ---------- Fila 1: contenido sobre la línea
