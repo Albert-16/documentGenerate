@@ -43,4 +43,58 @@ public static void AgregarBloqueFirmasDoble(
     // Centrar la tabla dentro del ancho útil
     tabla.Rows.LeftIndent = (anchoUtilPagina - anchoBloque) / 2;
 
-    // ---------- Fila 1: contenido sobre la línea
+    // ---------- Fila 1: contenido sobre la línea ----------
+    var filaContenido = tabla.AddRow();
+    filaContenido.HeightRule = RowHeightRule.Exactly;
+    filaContenido.Height = Unit.FromCentimeter(altoFilaContenidoCm);
+    filaContenido.VerticalAlignment = VerticalAlignment.Bottom;
+
+    var pImg = filaContenido.Cells[0].AddParagraph();
+    pImg.Format.Alignment = ParagraphAlignment.Center;
+    try
+    {
+        var img = pImg.AddImage(rutaImagenFirmaBanco);
+        img.LockAspectRatio = true;
+        img.Width = Unit.FromCentimeter(anchoImagenCm);
+    }
+    catch
+    {
+        var placeholder = pImg.AddFormattedText("[Firma del Banco]");
+        placeholder.Font.Bold = true;
+    }
+
+    filaContenido.Cells[1].AddParagraph(""); // espaciador
+
+    var pTextoDer = filaContenido.Cells[2].AddParagraph("Aceptado Digitalmente");
+    pTextoDer.Format.Alignment = ParagraphAlignment.Center;
+    pTextoDer.Format.Font.Bold = true;
+
+    // ---------- Fila 2: líneas de firma ----------
+    var filaLinea = tabla.AddRow();
+    filaLinea.HeightRule = RowHeightRule.Exactly;
+    filaLinea.Height = Unit.FromCentimeter(0.6);
+    filaLinea.VerticalAlignment = VerticalAlignment.Bottom;
+
+    filaLinea.Cells[0].Borders.Bottom.Width = 1;
+    filaLinea.Cells[0].Borders.Bottom.Color = Colors.Black;
+
+    filaLinea.Cells[1].AddParagraph(""); // espaciador
+
+    filaLinea.Cells[2].Borders.Bottom.Width = 1;
+    filaLinea.Cells[2].Borders.Bottom.Color = Colors.Black;
+
+    // ---------- Fila 3: etiquetas ----------
+    var filaEtiquetas = tabla.AddRow();
+    filaEtiquetas.HeightRule = RowHeightRule.AtLeast;
+    filaEtiquetas.Height = Unit.FromCentimeter(0.8);
+
+    var pBanco = filaEtiquetas.Cells[0].AddParagraph("El Banco");
+    pBanco.Format.Alignment = ParagraphAlignment.Center;
+    pBanco.Format.Font.Size = 9;
+
+    filaEtiquetas.Cells[1].AddParagraph(""); // espaciador
+
+    var pCliente = filaEtiquetas.Cells[2].AddParagraph("El Cliente");
+    pCliente.Format.Alignment = ParagraphAlignment.Center;
+    pCliente.Format.Font.Size = 9;
+}
