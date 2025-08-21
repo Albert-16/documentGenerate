@@ -1,75 +1,82 @@
+using System.IO;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 
-public static void AgregarBloqueFirmasDoble(
+public static void AgregarBloqueFirmasDobleSeguro(
     Section section,
     string rutaImagenFirmaBanco,
-    double separacionCm = 1.0,
-    double altoFilaContenidoCm = 1.8,
-    double anchoImagenCm = 4.5,
-    double anchoBloqueTotalCm = 0 // 0 = usar todo el ancho útil (página - márgenes)
+    double separacionCm = 1.0,          // separación entre ambas firmas
+    double altoContenidoCm = 2.0,        // altura disponible para imagen/texto sobre la línea
+    double anchoImagenMaxCm = 4.5,       // ancho máximo permitido para la imagen
+    double anchoBloqueTotalCm = 0        // 0 = usa todo el ancho útil
 )
 {
     if (section == null) throw new ArgumentNullException(nameof(section));
 
     // Ancho útil de la página
-    Unit anchoUtilPagina = section.PageSetup.PageWidth - section.PageSetup.LeftMargin - section.PageSetup.RightMargin;
+    Unit anchoUtil = section.PageSetup.PageWidth - section.PageSetup.LeftMargin - section.PageSetup.RightMargin;
 
-    // Ancho del bloque (puede ser menor al útil para que no ocupe todo el ancho)
-    Unit anchoBloque = anchoBloqueTotalCm > 0
-        ? Unit.FromCentimeter(anchoBloqueTotalCm)
-        : anchoUtilPagina;
+    // Ancho del bloque de firmas (centrado)
+    Unit anchoBloque = anchoBloqueTotalCm > 0 ? Unit.FromCentimeter(anchoBloqueTotalCm) : anchoUtil;
 
-    // Columnas: [Firma IZQ][Espaciador][Firma DER]
-    Unit colEspaciadora = Unit.FromCentimeter(separacionCm);
-    if (colEspaciadora > anchoBloque) colEspaciadora = anchoBloque / 10; // salvaguarda
-    Unit colFirma = (anchoBloque - colEspaciadora) / 2;
+    // Usamos 3 columnas: IZQ | ESPACIADOR | DER
+    Unit colEspacio = Unit.FromCentimeter(separacionCm);
+    if (colEspacio > anchoBloque) colEspacio = anchoBloque / 10; // salvaguarda
+    Unit colFirma = (anchoBloque - colEspacio) / 2;
 
-    // Tabla
     var tabla = section.AddTable();
     tabla.Borders.Width = 0;
-    tabla.TopPadding = 0;
-    tabla.BottomPadding = 0;
-    tabla.LeftPadding = 0;
-    tabla.RightPadding = 0;
+    tabla.LeftPadding = 0; tabla.RightPadding = 0; tabla.TopPadding = 0; tabla.BottomPadding = 0;
     tabla.Format.SpaceBefore = Unit.FromCentimeter(0.4);
-    tabla.Format.SpaceAfter = Unit.FromCentimeter(0.4);
-    tabla.Format.Alignment = ParagraphAlignment.Center; // centra contenido de párrafos
+    tabla.Format.SpaceAfter  = Unit.FromCentimeter(0.4);
+    tabla.Format.Alignment   = ParagraphAlignment.Center;
 
     tabla.AddColumn(colFirma);
-    tabla.AddColumn(colEspaciadora);
+    tabla.AddColumn(colEspacio);
     tabla.AddColumn(colFirma);
 
-    // Centrar la tabla dentro del ancho útil
-    tabla.Rows.LeftIndent = (anchoUtilPagina - anchoBloque) / 2;
+    // Centrar tabla dentro del ancho útil
+    tabla.Rows.LeftIndent = (anchoUtil - anchoBloque) / 2;
 
-    // ---------- Fila 1: contenido sobre la línea ----------
+    // ================= Fila 1: contenido sobre la línea =================
     var filaContenido = tabla.AddRow();
     filaContenido.HeightRule = RowHeightRule.Exactly;
-    filaContenido.Height = Unit.FromCentimeter(altoFilaContenidoCm);
+    filaContenido.Height = Unit.FromCentimeter(altoContenidoCm);
     filaContenido.VerticalAlignment = VerticalAlignment.Bottom;
 
+    // --- IZQ: imagen firma banco (con ajuste de tamaño para que SIEMPRE se vea) ---
     var pImg = filaContenido.Cells[0].AddParagraph();
     pImg.Format.Alignment = ParagraphAlignment.Center;
-    try
+
+    if (!string.IsNullOrWhiteSpace(rutaImagenFirmaBanco) && File.Exists(rutaImagenFirmaBanco))
     {
         var img = pImg.AddImage(rutaImagenFirmaBanco);
         img.LockAspectRatio = true;
-        img.Width = Unit.FromCentimeter(anchoImagenCm);
+
+        // Limitar por ALTO para que no se corte.
+        var altoMax = Unit.FromCentimeter(altoContenidoCm - 0.2);  // pequeño margen superior/inferior
+        img.Height = altoMax;
+
+        // Además, limitar por ANCHO para que no desborde la columna.
+        var anchoMax = Unit.FromCentimeter(anchoImagenMaxCm);
+        if (anchoMax > colFirma) anchoMax = colFirma - Unit.FromPoint(2); // deja 1pt por lado
+        img.Width = anchoMax;
     }
-    catch
+    else
     {
         var placeholder = pImg.AddFormattedText("[Firma del Banco]");
         placeholder.Font.Bold = true;
     }
 
-    filaContenido.Cells[1].AddParagraph(""); // espaciador
+    // Espaciador central
+    filaContenido.Cells[1].AddParagraph("");
 
+    // --- DER: texto “Aceptado Digitalmente” ---
     var pTextoDer = filaContenido.Cells[2].AddParagraph("Aceptado Digitalmente");
     pTextoDer.Format.Alignment = ParagraphAlignment.Center;
     pTextoDer.Format.Font.Bold = true;
 
-    // ---------- Fila 2: líneas de firma ----------
+    // ================= Fila 2: líneas de firma =================
     var filaLinea = tabla.AddRow();
     filaLinea.HeightRule = RowHeightRule.Exactly;
     filaLinea.Height = Unit.FromCentimeter(0.6);
@@ -83,7 +90,7 @@ public static void AgregarBloqueFirmasDoble(
     filaLinea.Cells[2].Borders.Bottom.Width = 1;
     filaLinea.Cells[2].Borders.Bottom.Color = Colors.Black;
 
-    // ---------- Fila 3: etiquetas ----------
+    // ================= Fila 3: etiquetas =================
     var filaEtiquetas = tabla.AddRow();
     filaEtiquetas.HeightRule = RowHeightRule.AtLeast;
     filaEtiquetas.Height = Unit.FromCentimeter(0.8);
@@ -92,7 +99,7 @@ public static void AgregarBloqueFirmasDoble(
     pBanco.Format.Alignment = ParagraphAlignment.Center;
     pBanco.Format.Font.Size = 9;
 
-    filaEtiquetas.Cells[1].AddParagraph(""); // espaciador
+    filaEtiquetas.Cells[1].AddParagraph("");
 
     var pCliente = filaEtiquetas.Cells[2].AddParagraph("El Cliente");
     pCliente.Format.Alignment = ParagraphAlignment.Center;
