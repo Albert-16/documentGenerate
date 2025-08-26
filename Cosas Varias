@@ -1,99 +1,37 @@
-using System;
-using System.IO;
-using MigraDoc.DocumentObjectModel;
-using MigraDoc.DocumentObjectModel.Tables;
-
-public static void AgregarFirmasDosColumnas(
-    Section sec,
-    string rutaFirmaBanco,                         // puede ser null/empty; se reserva espacio igual
-    string etiquetaBanco = "El Banco",
-    string etiquetaCliente = "El Cliente",
-    string textoSobreLineaCliente = "Aceptado Digitalmente",
-    double anchoColumnaCm = 7.0,                  // ancho de cada firma (columna)
-    double altoContenidoCm = 2.0,                 // alto fijo de la fila superior (imagen/texto)
-    double grosorLineaPt = 1.0,                   // grosor línea de firma
-    double espacioAntesCm = 0.0,                  // margen superior del bloque
-    double espacioDespuesCm = 0.0,                // margen inferior del bloque
-    double separacionEntreColumnasCm = 1.0        // gap visual entre firmas (se logra con indent)
-)
+public static class PdfFormularioHelper
 {
-    if (sec == null) throw new ArgumentNullException(nameof(sec));
-
-    // ---- Cálculo de centrado del bloque ----
-    Unit anchoUtil = sec.PageSetup.PageWidth - sec.PageSetup.LeftMargin - sec.PageSetup.RightMargin;
-    Unit anchoTabla = Unit.FromCentimeter(anchoColumnaCm * 2 + separacionEntreColumnasCm);
-    if (anchoTabla > anchoUtil) anchoTabla = anchoUtil; // salvaguarda
-    Unit leftIndent = (anchoUtil - anchoTabla) / 2;
-
-    // ---- Tabla 2 columnas, 3 filas ----
-    var tabla = sec.AddTable();
-    tabla.Borders.Width = 0;
-    tabla.LeftPadding = 0; tabla.RightPadding = 0; tabla.TopPadding = 0; tabla.BottomPadding = 0;
-    tabla.Format.SpaceBefore = Unit.FromCentimeter(espacioAntesCm);
-    tabla.Format.SpaceAfter  = Unit.FromCentimeter(espacioDespuesCm);
-    tabla.Rows.LeftIndent = leftIndent;
-
-    // Columnas iguales y dejamos el “gap” restando ese ancho al centro vía leftIndent
-    var colW = Unit.FromCentimeter(anchoColumnaCm);
-    tabla.AddColumn(colW); // Banco
-    tabla.AddColumn(colW); // Cliente
-
-    // ================= Fila 1: CONTENIDO SOBRE LA LÍNEA =================
-    var filaContenido = tabla.AddRow();
-    filaContenido.HeightRule = RowHeightRule.Exactly;
-    filaContenido.Height = Unit.FromCentimeter(altoContenidoCm);
-    filaContenido.VerticalAlignment = VerticalAlignment.Bottom;   // ambos contenidos pegados abajo
-
-    // IZQ (Banco): imagen si existe; si no, se reserva el mismo alto con un párrafo vacío
-    var pImg = filaContenido.Cells[0].AddParagraph();
-    pImg.Format.Alignment = ParagraphAlignment.Center;
-
-    if (!string.IsNullOrWhiteSpace(rutaFirmaBanco) && File.Exists(rutaFirmaBanco))
+    public static void AgregarBloque2x2(Section section, List<(string Etiqueta, string Valor)> campos)
     {
-        var img = pImg.AddImage(rutaFirmaBanco);
-        img.LockAspectRatio = true;
+        var table = section.AddTable();
+        table.Format.Font.Name = "Times New Roman";
+        table.Format.Font.Size = 9;
 
-        // Ajuste por ALTO para que NUNCA desborde la fila
-        var altoMax = Unit.FromCentimeter(Math.Max(0.1, altoContenidoCm - 0.2)); // pequeño margen
-        img.Height = altoMax;
+        // 4 columnas (Etiqueta - Valor - Etiqueta - Valor)
+        table.AddColumn("3cm");
+        table.AddColumn("5cm");
+        table.AddColumn("3cm");
+        table.AddColumn("5cm");
 
-        // Tope por ANCHO para evitar desbordar la columna
-        var anchoMax = colW - Unit.FromPoint(2);
-        if (img.Width > anchoMax) img.Width = anchoMax;
+        for (int i = 0; i < campos.Count; i += 2)
+        {
+            var row = table.AddRow();
+
+            // Primer campo
+            row.Cells[0].AddParagraph(campos[i].Etiqueta).Format.Bold = true;
+            row.Cells[1].AddParagraph(campos[i].Valor ?? string.Empty);
+
+            // Segundo campo (si existe)
+            if (i + 1 < campos.Count)
+            {
+                row.Cells[2].AddParagraph(campos[i + 1].Etiqueta).Format.Bold = true;
+                row.Cells[3].AddParagraph(campos[i + 1].Valor ?? string.Empty);
+            }
+        }
+
+        // Línea separadora al final del bloque
+        var line = section.AddParagraph();
+        line.Format.SpaceBefore = 3;
+        line.Format.SpaceAfter = 3;
+        line.AddFormattedText(new string('_', 120));
     }
-    else
-    {
-        // Reservamos espacio equivalente cuando no hay imagen (alineación simétrica)
-        pImg.Format.SpaceBefore = $"{Math.Max(0.0, altoContenidoCm - 0.2)}cm";
-    }
-
-    // DER (Cliente): “Aceptado Digitalmente”
-    var pDer = filaContenido.Cells[1].AddParagraph(textoSobreLineaCliente);
-    pDer.Format.Alignment = ParagraphAlignment.Center;
-    pDer.Format.Font.Bold = true;
-
-    // ================= Fila 2: LÍNEAS DE FIRMA =================
-    var filaLinea = tabla.AddRow();
-    filaLinea.HeightRule = RowHeightRule.Exactly;
-    filaLinea.Height = Unit.FromCentimeter(0.6);
-    filaLinea.VerticalAlignment = VerticalAlignment.Bottom;
-
-    filaLinea.Cells[0].Borders.Bottom.Width = grosorLineaPt;
-    filaLinea.Cells[0].Borders.Bottom.Color = Colors.Black;
-
-    filaLinea.Cells[1].Borders.Bottom.Width = grosorLineaPt;
-    filaLinea.Cells[1].Borders.Bottom.Color = Colors.Black;
-
-    // ================= Fila 3: ETIQUETAS =================
-    var filaEtiq = tabla.AddRow();
-    filaEtiq.HeightRule = RowHeightRule.AtLeast;
-    filaEtiq.Height = Unit.FromCentimeter(0.8);
-
-    var pBanco = filaEtiq.Cells[0].AddParagraph(etiquetaBanco);
-    pBanco.Format.Alignment = ParagraphAlignment.Center;
-    pBanco.Format.Font.Size = 9;
-
-    var pCliente = filaEtiq.Cells[1].AddParagraph(etiquetaCliente);
-    pCliente.Format.Alignment = ParagraphAlignment.Center;
-    pCliente.Format.Font.Size = 9;
 }
