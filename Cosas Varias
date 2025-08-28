@@ -1,43 +1,39 @@
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 
-public static class PdfSeparadoresHelper
+public void AgregarModuloBeneficiarios(
+    Section sec,
+    List<(string Beneficiario, string Parentesco, string Identidad)> filas)
 {
-    public static void AddLinea(
-        Section sec,
-        double grosorPt = 0.75,
-        double espacioArribaPt = 4,
-        double espacioAbajoPt = 4)
+    var table = sec.AddTable();
+    table.Format.Font.Name = "Arial";
+    table.Format.Font.Size = 9;
+    table.Borders.Width = 0;
+
+    // A4 con márgenes 1 cm ≈ 17 cm de ancho util
+    table.AddColumn("8cm");  // Beneficiario
+    table.AddColumn("4cm");  // Parentesco
+    table.AddColumn("5cm");  // Identidad
+
+    // Encabezado
+    var header = table.AddRow();
+    header.Format.Font.Bold = true;
+    header.Shading.Color = Colors.WhiteSmoke;
+    header.Cells[0].AddParagraph("Beneficiario");
+    header.Cells[1].AddParagraph("Parentesco");
+    header.Cells[2].AddParagraph("Identidad");
+
+    // Filas
+    foreach (var f in filas)
     {
-        var contentWidth = sec.PageSetup.PageWidth
-                          - sec.PageSetup.LeftMargin
-                          - sec.PageSetup.RightMargin;
-
-        var table = sec.AddTable();
-        table.Borders.Width = 0;
-        table.LeftPadding = 0;
-        table.RightPadding = 0;
-        table.TopPadding = 0;
-        table.BottomPadding = 0;
-        table.Format.SpaceBefore = 0;
-        table.Format.SpaceAfter  = 0;
-
-        table.AddColumn(contentWidth);
-
         var row = table.AddRow();
-
-        // línea
-        row.Borders.Bottom.Width = grosorPt;
-        row.Borders.Bottom.Color = Colors.Gray;
-
-        // alto mínimo = grosor; NO Exactly para que respete padding
-        row.HeightRule = RowHeightRule.AtLeast;
-        row.Height = Unit.FromPoint(grosorPt);
-
-        // aire simétrico SIN párrafos
-        row.TopPadding = Unit.FromPoint(espacioArribaPt);
-        row.BottomPadding = Unit.FromPoint(espacioAbajoPt);
-        row.Format.SpaceBefore = 0;
-        row.Format.SpaceAfter  = 0;
+        row.KeepTogether = true;             // ayuda a evitar cortes feos
+        row.BottomPadding = Unit.FromPoint(1);
+        row.Cells[0].AddParagraph(f.Beneficiario ?? string.Empty);
+        row.Cells[1].AddParagraph(f.Parentesco ?? string.Empty);
+        row.Cells[2].AddParagraph(f.Identidad ?? string.Empty);
     }
+
+    // Si usas separador visual:
+    // PdfSeparadoresHelper.AddLinea(sec, grosorPt: 0.75, espacioArribaPt: 4, espacioAbajoPt: 4);
 }
