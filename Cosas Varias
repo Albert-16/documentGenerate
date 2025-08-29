@@ -11,50 +11,44 @@ public void AgregarModuloReferencia(
     // Definir columnas
     table.AddColumn("7cm");   // Nombre
     table.AddColumn("4cm");   // Teléfono
-    table.AddColumn("5cm");   // Confirmada (con subencabezados)
+    table.AddColumn("2.5cm"); // Confirmada - SI
+    table.AddColumn("2.5cm"); // Confirmada - NO
 
-    // Primera fila: encabezado de CONFIRMADA
+    // -------- Fila 1: encabezado superior --------
     var rowTop = table.AddRow();
     rowTop.HeadingFormat = true;
     rowTop.Format.Font.Bold = true;
+    rowTop.Shading.Color = Colors.LightGray;
 
-    rowTop.Cells[0].AddParagraph("");   // vacío para columna Nombre
-    rowTop.Cells[1].AddParagraph("");   // vacío para columna Teléfono
-    rowTop.Cells[2].AddParagraph("CONFIRMADA"); // etiqueta general
+    rowTop.Cells[0].AddParagraph("");  // vacío para Nombre
+    rowTop.Cells[1].AddParagraph("");  // vacío para Teléfono
+    rowTop.Cells[2].AddParagraph("CONFIRMADA"); // título encima
+    rowTop.Cells[2].MergeRight = 1;   // Fusiona con columna NO
 
-    // Hacer que ocupe las 2 subcolumnas (SI y NO)
-    // En este caso, como la columna Confirmada será dividida en 2 sub-headers
-    rowTop.Cells[2].MergeDown = 0;
-
-    // Segunda fila: encabezados normales
+    // -------- Fila 2: encabezados normales --------
     var header = table.AddRow();
     header.Format.Font.Bold = true;
     header.Shading.Color = Colors.LightGray;
 
     header.Cells[0].AddParagraph("Nombre");
     header.Cells[1].AddParagraph("Teléfono");
-    header.Cells[2].AddParagraph("SI / NO"); // Sub-encabezado de Confirmada
+    header.Cells[2].AddParagraph("SI");
+    header.Cells[3].AddParagraph("NO");
 
-    // Agregar filas de datos
+    // -------- Filas de datos --------
     foreach (var f in filas)
     {
         var row = table.AddRow();
         row.Cells[0].AddParagraph(f.Nombre ?? string.Empty);
         row.Cells[1].AddParagraph(f.Telefono ?? string.Empty);
 
-        // Si quieres marcar X en SI o NO, aquí haces la lógica
-        var celda = row.Cells[2];
         if (f.Confirmada?.ToUpper() == "SI")
         {
-            celda.AddParagraph("X   /   ");
+            row.Cells[2].AddParagraph("X");
         }
         else if (f.Confirmada?.ToUpper() == "NO")
         {
-            celda.AddParagraph("    /  X");
-        }
-        else
-        {
-            celda.AddParagraph(string.Empty);
+            row.Cells[3].AddParagraph("X");
         }
     }
 }
