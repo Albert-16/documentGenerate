@@ -1,39 +1,60 @@
-using MigraDoc.DocumentObjectModel;
-using MigraDoc.DocumentObjectModel.Tables;
-
-public void AgregarModuloBeneficiarios(
+public void AgregarModuloReferencia(
     Section sec,
-    List<(string Beneficiario, string Parentesco, string Identidad)> filas)
+    List<(string Nombre, string Telefono, string Confirmada)> filas)
 {
     var table = sec.AddTable();
     table.Format.Font.Name = "Arial";
     table.Format.Font.Size = 9;
-    table.Borders.Width = 0;
+    table.Borders.Width = 0.75;
+    table.Format.SpaceBefore = "5";
 
-    // A4 con márgenes 1 cm ≈ 17 cm de ancho util
-    table.AddColumn("8cm");  // Beneficiario
-    table.AddColumn("4cm");  // Parentesco
-    table.AddColumn("5cm");  // Identidad
+    // Definir columnas
+    table.AddColumn("7cm");   // Nombre
+    table.AddColumn("4cm");   // Teléfono
+    table.AddColumn("5cm");   // Confirmada (con subencabezados)
 
-    // Encabezado
+    // Primera fila: encabezado de CONFIRMADA
+    var rowTop = table.AddRow();
+    rowTop.HeadingFormat = true;
+    rowTop.Format.Font.Bold = true;
+
+    rowTop.Cells[0].AddParagraph("");   // vacío para columna Nombre
+    rowTop.Cells[1].AddParagraph("");   // vacío para columna Teléfono
+    rowTop.Cells[2].AddParagraph("CONFIRMADA"); // etiqueta general
+
+    // Hacer que ocupe las 2 subcolumnas (SI y NO)
+    // En este caso, como la columna Confirmada será dividida en 2 sub-headers
+    rowTop.Cells[2].MergeDown = 0;
+
+    // Segunda fila: encabezados normales
     var header = table.AddRow();
     header.Format.Font.Bold = true;
-    header.Shading.Color = Colors.WhiteSmoke;
-    header.Cells[0].AddParagraph("Beneficiario");
-    header.Cells[1].AddParagraph("Parentesco");
-    header.Cells[2].AddParagraph("Identidad");
+    header.Shading.Color = Colors.LightGray;
 
-    // Filas
+    header.Cells[0].AddParagraph("Nombre");
+    header.Cells[1].AddParagraph("Teléfono");
+    header.Cells[2].AddParagraph("SI / NO"); // Sub-encabezado de Confirmada
+
+    // Agregar filas de datos
     foreach (var f in filas)
     {
         var row = table.AddRow();
-        row.KeepTogether = true;             // ayuda a evitar cortes feos
-        row.BottomPadding = Unit.FromPoint(1);
-        row.Cells[0].AddParagraph(f.Beneficiario ?? string.Empty);
-        row.Cells[1].AddParagraph(f.Parentesco ?? string.Empty);
-        row.Cells[2].AddParagraph(f.Identidad ?? string.Empty);
-    }
+        row.Cells[0].AddParagraph(f.Nombre ?? string.Empty);
+        row.Cells[1].AddParagraph(f.Telefono ?? string.Empty);
 
-    // Si usas separador visual:
-    // PdfSeparadoresHelper.AddLinea(sec, grosorPt: 0.75, espacioArribaPt: 4, espacioAbajoPt: 4);
+        // Si quieres marcar X en SI o NO, aquí haces la lógica
+        var celda = row.Cells[2];
+        if (f.Confirmada?.ToUpper() == "SI")
+        {
+            celda.AddParagraph("X   /   ");
+        }
+        else if (f.Confirmada?.ToUpper() == "NO")
+        {
+            celda.AddParagraph("    /  X");
+        }
+        else
+        {
+            celda.AddParagraph(string.Empty);
+        }
+    }
 }
