@@ -1,54 +1,201 @@
-public void AgregarModuloReferencia(
-    Section sec,
-    List<(string Nombre, string Telefono, string Confirmada)> filas)
+using System;
+using System.IO;
+using System.Security;
+using System.Text;
+
+namespace Infrastructure.Helpers
 {
-    var table = sec.AddTable();
-    table.Format.Font.Name = "Arial";
-    table.Format.Font.Size = 9;
-    table.Borders.Width = 0.75;
-    table.Format.SpaceBefore = "5";
-
-    // Definir columnas
-    table.AddColumn("7cm");   // Nombre
-    table.AddColumn("4cm");   // Teléfono
-    table.AddColumn("2.5cm"); // Confirmada - SI
-    table.AddColumn("2.5cm"); // Confirmada - NO
-
-    // -------- Fila 1: encabezado superior --------
-    var rowTop = table.AddRow();
-    rowTop.HeadingFormat = true;
-    rowTop.Format.Font.Bold = true;
-    rowTop.Shading.Color = Colors.LightGray;
-
-    rowTop.Cells[0].AddParagraph("");  // vacío para Nombre
-    rowTop.Cells[1].AddParagraph("");  // vacío para Teléfono
-    rowTop.Cells[2].AddParagraph("CONFIRMADA"); // título encima
-    rowTop.Cells[2].MergeRight = 1;   // Fusiona con columna NO
-
-    // -------- Fila 2: encabezados normales --------
-    var header = table.AddRow();
-    header.Format.Font.Bold = true;
-    header.Shading.Color = Colors.LightGray;
-
-    header.Cells[0].AddParagraph("Nombre");
-    header.Cells[1].AddParagraph("Teléfono");
-    header.Cells[2].AddParagraph("SI");
-    header.Cells[3].AddParagraph("NO");
-
-    // -------- Filas de datos --------
-    foreach (var f in filas)
+    /// <summary>
+    /// Convierte documentos PDF a Base64 con validaciones estrictas.
+    /// </summary>
+    public static class PdfBase64Helper
     {
-        var row = table.AddRow();
-        row.Cells[0].AddParagraph(f.Nombre ?? string.Empty);
-        row.Cells[1].AddParagraph(f.Telefono ?? string.Empty);
+        /// <summary>
+        /// Convierte un PDF a Base64 desde una ruta de archivo.
+        /// </summary>
+        /// <param name="pdfPath">Ruta absoluta del PDF.</param>
+        /// <param name="maxBytes">Tamaño máximo permitido en bytes (por defecto 25 MB).</param>
+        /// <param name="requirePdfExtension">Si true, exige extensión .pdf.</param>
+        /// <param name="allowedRootDirectory">
+        /// Raíz permitida (opcional). Si se especifica, el archivo debe estar dentro de este directorio.
+        /// </param>
+        /// <returns>Cadena Base64 del contenido del PDF (sin saltos de línea).</returns>
+        /// <exception cref="ArgumentException">Ruta nula, vacía o inválida.</exception>
+        /// <exception cref="FileNotFoundException">Archivo no existe.</exception>
+        /// <exception cref="UnauthorizedAccessException">Sin permisos de lectura.</exception>
+        /// <exception cref="IOException">Archivo bloqueado o problemas de E/S.</exception>
+        /// <exception cref="InvalidDataException">No es un PDF válido o supera límites.</exception>
+        public static string ToBase64FromPath(
+            string pdfPath,
+            long maxBytes = 25L * 1024 * 1024, // 25 MB
+            bool requirePdfExtension = true,
+            string allowedRootDirectory = null)
+        {
+            if (string.IsNullOrWhiteSpace(pdfPath))
+                throw new ArgumentException("La ruta del PDF no puede ser nula ni vacía.", nameof(pdfPath));
 
-        if (f.Confirmada?.ToUpper() == "SI")
-        {
-            row.Cells[2].AddParagraph("X");
+            // Normaliza y valida ruta
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(pdfPath);
+            }
+            catch (Exception ex) when (ex is NotSupportedException || ex is SecurityException)
+            {
+                throw new ArgumentException("La ruta del PDF es inválida o no está permitida.", nameof(pdfPath));
+            }
+
+            if (!File.Exists(fullPath))
+                throw new FileNotFoundException("El archivo PDF no existe.", fullPath);
+
+            if (requirePdfExtension && !fullPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("El archivo no tiene extensión .pdf.");
+
+            if (!string.IsNullOrWhiteSpace(allowedRootDirectory))
+            {
+                var root = Path.GetFullPath(allowedRootDirectory);
+                if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException("La ruta del PDF está fuera del directorio permitido.");
+            }
+
+            var fi = new FileInfo(fullPath);
+            if (fi.Length <= 0)
+                throw new InvalidDataException("El archivo PDF está vacío.");
+            if (fi.Length > maxBytes)
+                throw new InvalidDataException($"El archivo PDF supera el tamaño máximo permitido ({maxBytes} bytes).");
+
+            // Abrimos con FileShare.Read para detectar bloqueos de escritura
+            using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                // Validaciones de firma PDF y EOF
+                ValidatePdfSignatureAndEof(fs);
+
+                // Lee bytes completos de forma segura (para ≤ 25–50 MB es aceptable en memoria)
+                // Si esperas PDFs muy grandes, implementar codificación streaming con ToBase64Transform.
+                byte[] data = ReadAllBytes(fs);
+
+                // Convertir a Base64 sin saltos de línea (importante para transmitir por JSON)
+                return Convert.ToBase64String(data, Base64FormattingOptions.None);
+            }
         }
-        else if (f.Confirmada?.ToUpper() == "NO")
+
+        /// <summary>
+        /// Convierte a Base64 desde un arreglo de bytes que representa un PDF.
+        /// </summary>
+        public static string ToBase64FromBytes(byte[] pdfBytes, long maxBytes = 25L * 1024 * 1024)
         {
-            row.Cells[3].AddParagraph("X");
+            if (pdfBytes == null || pdfBytes.Length == 0)
+                throw new InvalidDataException("Los bytes del PDF son nulos o vacíos.");
+            if (pdfBytes.LongLength > maxBytes)
+                throw new InvalidDataException($"El PDF en memoria supera el tamaño máximo permitido ({maxBytes} bytes).");
+
+            using (var ms = new MemoryStream(pdfBytes, writable: false))
+            {
+                ValidatePdfSignatureAndEof(ms);
+            }
+
+            return Convert.ToBase64String(pdfBytes, Base64FormattingOptions.None);
+        }
+
+        /// <summary>
+        /// Convierte a Base64 desde un Stream legible que contiene un PDF.
+        /// No cierra el Stream original.
+        /// </summary>
+        public static string ToBase64FromStream(Stream pdfStream, long maxBytes = 25L * 1024 * 1024)
+        {
+            if (pdfStream == null)
+                throw new ArgumentException("El Stream del PDF no puede ser nulo.", nameof(pdfStream));
+            if (!pdfStream.CanRead)
+                throw new IOException("El Stream del PDF no es legible.");
+
+            // Copiamos a MemoryStream para validaciones y conversión
+            using (var ms = new MemoryStream())
+            {
+                pdfStream.Position = 0;
+                pdfStream.CopyTo(ms);
+
+                if (ms.Length <= 0)
+                    throw new InvalidDataException("El Stream del PDF está vacío.");
+                if (ms.Length > maxBytes)
+                    throw new InvalidDataException($"El PDF supera el tamaño máximo permitido ({maxBytes} bytes).");
+
+                ms.Position = 0;
+                ValidatePdfSignatureAndEof(ms);
+
+                var bytes = ms.ToArray();
+                return Convert.ToBase64String(bytes, Base64FormattingOptions.None);
+            }
+        }
+
+        // ================== Utilitarios privados ==================
+
+        private static byte[] ReadAllBytes(FileStream fs)
+        {
+            // Usa el length preconocido para evitar realocaciones
+            var length = checked((int)fs.Length);
+            var buffer = new byte[length];
+            int offset = 0;
+            int read;
+            while ((read = fs.Read(buffer, offset, length - offset)) > 0)
+            {
+                offset += read;
+            }
+            if (offset != length)
+                throw new IOException("No se pudo leer completamente el archivo PDF.");
+            return buffer;
+        }
+
+        /// <summary>
+        /// Verifica que el Stream tenga firma %PDF- al inicio y '%%EOF' cercano al final.
+        /// </summary>
+        private static void ValidatePdfSignatureAndEof(Stream s)
+        {
+            if (!s.CanSeek)
+                throw new IOException("No se puede posicionar el Stream para validar el PDF.");
+
+            // Valida firma "%PDF-"
+            s.Position = 0;
+            var header = new byte[5];
+            int readHeader = s.Read(header, 0, header.Length);
+            if (readHeader < header.Length || header[0] != 0x25 || header[1] != 0x50 || header[2] != 0x44 || header[3] != 0x46 || header[4] != 0x2D) // %PDF-
+                throw new InvalidDataException("El archivo no tiene la firma de un PDF (%PDF-).");
+
+            // Busca '%%EOF' en los últimos ~2 KB (heurística razonable para PDFs bien formados)
+            const int tailScan = 2048;
+            var len = s.Length;
+            var scanSize = (int)Math.Min(tailScan, len);
+            var tail = new byte[scanSize];
+
+            s.Position = len - scanSize;
+            int readTail = s.Read(tail, 0, scanSize);
+            if (readTail <= 0)
+                throw new InvalidDataException("No fue posible leer el final del PDF.");
+
+            var tailText = Encoding.ASCII.GetString(tail, 0, readTail);
+            if (tailText.IndexOf("%%EOF", StringComparison.Ordinal) < 0)
+                throw new InvalidDataException("No se encontró el marcador '%%EOF' al final del PDF.");
+        }
+
+        // ================== Opción Try* sin excepciones ==================
+
+        /// <summary>
+        /// Variante segura que no lanza excepciones. Devuelve true/false y rellena base64 o errorMessage.
+        /// </summary>
+        public static bool TryToBase64FromPath(string pdfPath, out string base64, out string errorMessage,
+            long maxBytes = 25L * 1024 * 1024, bool requirePdfExtension = true, string allowedRootDirectory = null)
+        {
+            base64 = null;
+            errorMessage = null;
+            try
+            {
+                base64 = ToBase64FromPath(pdfPath, maxBytes, requirePdfExtension, allowedRootDirectory);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
         }
     }
 }
