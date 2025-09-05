@@ -1,127 +1,30 @@
 using System;
 using System.IO;
-using System.Linq;
 
-namespace Infrastructure.Helpers
+public static class PdfBase64SimpleHelper
 {
-    public static partial class PdfBase64Helper
+    /// <summary>
+    /// Convierte un PDF a Base64.
+    /// </summary>
+    /// <param name="fileName">Nombre del archivo PDF (ej: "Contrato.pdf").</param>
+    /// <param name="directory">Directorio donde está el archivo (ej: @"C:\Banco\Docs").</param>
+    /// <returns>Cadena Base64 del PDF.</returns>
+    public static string ConvertToBase64(string fileName, string directory)
     {
-        /// <summary>
-        /// Convierte a Base64 un PDF identificado solo por su nombre dentro de un directorio.
-        /// Evita traversal (..), valida extensión y reusa las validaciones fuertes del helper.
-        /// </summary>
-        /// <param name="fileName">Nombre del archivo, con o sin extensión (ej: "Contrato" o "Contrato.pdf").</param>
-        /// <param name="directory">Directorio donde se buscará el PDF.</param>
-        /// <param name="maxBytes">Límite de tamaño para seguridad (por defecto 25 MB).</param>
-        /// <param name="requirePdfExtension">Si true, exige que el archivo final sea .pdf.</param>
-        /// <param name="allowCaseInsensitiveSearch">
-        /// Si true, buscará el archivo ignorando mayúsculas/minúsculas y agregará ".pdf" si falta.
-        /// </param>
-        /// <returns>Cadena Base64 del PDF.</returns>
-        public static string ToBase64FromName(
-            string fileName,
-            string directory,
-            long maxBytes = 25L * 1024 * 1024,
-            bool requirePdfExtension = true,
-            bool allowCaseInsensitiveSearch = true)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-                throw new ArgumentException("El nombre de archivo no puede ser nulo o vacío.", nameof(fileName));
-            if (string.IsNullOrWhiteSpace(directory))
-                throw new ArgumentException("El directorio no puede ser nulo o vacío.", nameof(directory));
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("El nombre del archivo no puede ser vacío.", nameof(fileName));
 
-            // 1) Normaliza y blinda el nombre para evitar traversal o rutas completas
-            //    (solo se admite el nombre base, sin separadores)
-            var safeName = Path.GetFileName(fileName.Trim());
-            if (string.IsNullOrWhiteSpace(safeName) || safeName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                throw new ArgumentException("El nombre de archivo contiene caracteres inválidos.", nameof(fileName));
+        if (string.IsNullOrWhiteSpace(directory))
+            throw new ArgumentException("El directorio no puede ser vacío.", nameof(directory));
 
-            // 2) Normaliza directorio y valida que exista
-            var baseDir = Path.GetFullPath(directory);
-            if (!Directory.Exists(baseDir))
-                throw new DirectoryNotFoundException($"El directorio especificado no existe: {baseDir}");
+        // Arma la ruta completa
+        string fullPath = Path.Combine(directory, fileName);
 
-            string candidatePath = Path.Combine(baseDir, safeName);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("No se encontró el archivo PDF.", fullPath);
 
-            // 3) Resolver archivo:
-            //    a) Si dieron extensión .pdf exacta y existe → usarlo.
-            //    b) Si no existe y se permite búsqueda flexible:
-            //       - agregar .pdf si falta
-            //       - o buscar por coincidencia insensible a mayúsculas dentro del directorio
-            if (!File.Exists(candidatePath))
-            {
-                if (!allowCaseInsensitiveSearch)
-                    throw new FileNotFoundException("No se encontró el archivo indicado en el directorio.", candidatePath);
-
-                // Si no tiene extensión, probar con .pdf
-                if (Path.GetExtension(candidatePath).Length == 0)
-                {
-                    var withPdf = candidatePath + ".pdf";
-                    if (File.Exists(withPdf))
-                        candidatePath = withPdf;
-                    else
-                    {
-                        // Buscar por coincidencia (insensible a mayúsculas)
-                        var targetNameNoExt = Path.GetFileNameWithoutExtension(safeName);
-                        var match = Directory.EnumerateFiles(baseDir, "*.pdf", SearchOption.TopDirectoryOnly)
-                                             .FirstOrDefault(p =>
-                                                 string.Equals(Path.GetFileNameWithoutExtension(p),
-                                                               targetNameNoExt,
-                                                               StringComparison.OrdinalIgnoreCase));
-                        if (match != null)
-                            candidatePath = match;
-                    }
-                }
-                else
-                {
-                    // Buscar por coincidencia exacta de nombre (insensible a mayúsculas)
-                    var justName = Path.GetFileName(candidatePath);
-                    var match = Directory.EnumerateFiles(baseDir, "*.pdf", SearchOption.TopDirectoryOnly)
-                                         .FirstOrDefault(p =>
-                                             string.Equals(Path.GetFileName(p),
-                                                           justName,
-                                                           StringComparison.OrdinalIgnoreCase));
-                    if (match != null)
-                        candidatePath = match;
-                }
-            }
-
-            if (!File.Exists(candidatePath))
-                throw new FileNotFoundException("No se encontró el PDF con el nombre proporcionado en el directorio.", candidatePath);
-
-            // 4) Seguridad adicional: asegúrate que realmente quedó dentro del directorio permitido
-            var finalFullPath = Path.GetFullPath(candidatePath);
-            if (!finalFullPath.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase))
-                throw new UnauthorizedAccessException("El archivo resuelto quedó fuera del directorio permitido.");
-
-            // 5) Reutiliza las validaciones fuertes del método principal
-            return ToBase64FromPath(finalFullPath, maxBytes, requirePdfExtension, allowedRootDirectory: baseDir);
-        }
-
-        /// <summary>
-        /// Variante Try* que no lanza excepciones.
-        /// </summary>
-        public static bool TryToBase64FromName(
-            string fileName,
-            string directory,
-            out string base64,
-            out string errorMessage,
-            long maxBytes = 25L * 1024 * 1024,
-            bool requirePdfExtension = true,
-            bool allowCaseInsensitiveSearch = true)
-        {
-            base64 = null;
-            errorMessage = null;
-            try
-            {
-                base64 = ToBase64FromName(fileName, directory, maxBytes, requirePdfExtension, allowCaseInsensitiveSearch);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                errorMessage = ex.Message;
-                return false;
-            }
-        }
+        // Lee todos los bytes y devuelve Base64
+        byte[] pdfBytes = File.ReadAllBytes(fullPath);
+        return Convert.ToBase64String(pdfBytes, Base64FormattingOptions.None);
     }
 }
