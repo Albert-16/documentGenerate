@@ -1,194 +1,120 @@
 using System;
 using System.IO;
-using System.Security;
-using System.Text;
+using System.Linq;
 
 namespace Infrastructure.Helpers
 {
-    /// <summary>
-    /// Convierte documentos PDF a Base64 con validaciones estrictas.
-    /// </summary>
-    public static class PdfBase64Helper
+    public static partial class PdfBase64Helper
     {
         /// <summary>
-        /// Convierte un PDF a Base64 desde una ruta de archivo.
+        /// Convierte a Base64 un PDF identificado solo por su nombre dentro de un directorio.
+        /// Evita traversal (..), valida extensión y reusa las validaciones fuertes del helper.
         /// </summary>
-        /// <param name="pdfPath">Ruta absoluta del PDF.</param>
-        /// <param name="maxBytes">Tamaño máximo permitido en bytes (por defecto 25 MB).</param>
-        /// <param name="requirePdfExtension">Si true, exige extensión .pdf.</param>
-        /// <param name="allowedRootDirectory">
-        /// Raíz permitida (opcional). Si se especifica, el archivo debe estar dentro de este directorio.
+        /// <param name="fileName">Nombre del archivo, con o sin extensión (ej: "Contrato" o "Contrato.pdf").</param>
+        /// <param name="directory">Directorio donde se buscará el PDF.</param>
+        /// <param name="maxBytes">Límite de tamaño para seguridad (por defecto 25 MB).</param>
+        /// <param name="requirePdfExtension">Si true, exige que el archivo final sea .pdf.</param>
+        /// <param name="allowCaseInsensitiveSearch">
+        /// Si true, buscará el archivo ignorando mayúsculas/minúsculas y agregará ".pdf" si falta.
         /// </param>
-        /// <returns>Cadena Base64 del contenido del PDF (sin saltos de línea).</returns>
-        /// <exception cref="ArgumentException">Ruta nula, vacía o inválida.</exception>
-        /// <exception cref="FileNotFoundException">Archivo no existe.</exception>
-        /// <exception cref="UnauthorizedAccessException">Sin permisos de lectura.</exception>
-        /// <exception cref="IOException">Archivo bloqueado o problemas de E/S.</exception>
-        /// <exception cref="InvalidDataException">No es un PDF válido o supera límites.</exception>
-        public static string ToBase64FromPath(
-            string pdfPath,
-            long maxBytes = 25L * 1024 * 1024, // 25 MB
+        /// <returns>Cadena Base64 del PDF.</returns>
+        public static string ToBase64FromName(
+            string fileName,
+            string directory,
+            long maxBytes = 25L * 1024 * 1024,
             bool requirePdfExtension = true,
-            string allowedRootDirectory = null)
+            bool allowCaseInsensitiveSearch = true)
         {
-            if (string.IsNullOrWhiteSpace(pdfPath))
-                throw new ArgumentException("La ruta del PDF no puede ser nula ni vacía.", nameof(pdfPath));
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new ArgumentException("El nombre de archivo no puede ser nulo o vacío.", nameof(fileName));
+            if (string.IsNullOrWhiteSpace(directory))
+                throw new ArgumentException("El directorio no puede ser nulo o vacío.", nameof(directory));
 
-            // Normaliza y valida ruta
-            string fullPath;
-            try
+            // 1) Normaliza y blinda el nombre para evitar traversal o rutas completas
+            //    (solo se admite el nombre base, sin separadores)
+            var safeName = Path.GetFileName(fileName.Trim());
+            if (string.IsNullOrWhiteSpace(safeName) || safeName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new ArgumentException("El nombre de archivo contiene caracteres inválidos.", nameof(fileName));
+
+            // 2) Normaliza directorio y valida que exista
+            var baseDir = Path.GetFullPath(directory);
+            if (!Directory.Exists(baseDir))
+                throw new DirectoryNotFoundException($"El directorio especificado no existe: {baseDir}");
+
+            string candidatePath = Path.Combine(baseDir, safeName);
+
+            // 3) Resolver archivo:
+            //    a) Si dieron extensión .pdf exacta y existe → usarlo.
+            //    b) Si no existe y se permite búsqueda flexible:
+            //       - agregar .pdf si falta
+            //       - o buscar por coincidencia insensible a mayúsculas dentro del directorio
+            if (!File.Exists(candidatePath))
             {
-                fullPath = Path.GetFullPath(pdfPath);
+                if (!allowCaseInsensitiveSearch)
+                    throw new FileNotFoundException("No se encontró el archivo indicado en el directorio.", candidatePath);
+
+                // Si no tiene extensión, probar con .pdf
+                if (Path.GetExtension(candidatePath).Length == 0)
+                {
+                    var withPdf = candidatePath + ".pdf";
+                    if (File.Exists(withPdf))
+                        candidatePath = withPdf;
+                    else
+                    {
+                        // Buscar por coincidencia (insensible a mayúsculas)
+                        var targetNameNoExt = Path.GetFileNameWithoutExtension(safeName);
+                        var match = Directory.EnumerateFiles(baseDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                                             .FirstOrDefault(p =>
+                                                 string.Equals(Path.GetFileNameWithoutExtension(p),
+                                                               targetNameNoExt,
+                                                               StringComparison.OrdinalIgnoreCase));
+                        if (match != null)
+                            candidatePath = match;
+                    }
+                }
+                else
+                {
+                    // Buscar por coincidencia exacta de nombre (insensible a mayúsculas)
+                    var justName = Path.GetFileName(candidatePath);
+                    var match = Directory.EnumerateFiles(baseDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                                         .FirstOrDefault(p =>
+                                             string.Equals(Path.GetFileName(p),
+                                                           justName,
+                                                           StringComparison.OrdinalIgnoreCase));
+                    if (match != null)
+                        candidatePath = match;
+                }
             }
-            catch (Exception ex) when (ex is NotSupportedException || ex is SecurityException)
-            {
-                throw new ArgumentException("La ruta del PDF es inválida o no está permitida.", nameof(pdfPath));
-            }
 
-            if (!File.Exists(fullPath))
-                throw new FileNotFoundException("El archivo PDF no existe.", fullPath);
+            if (!File.Exists(candidatePath))
+                throw new FileNotFoundException("No se encontró el PDF con el nombre proporcionado en el directorio.", candidatePath);
 
-            if (requirePdfExtension && !fullPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("El archivo no tiene extensión .pdf.");
+            // 4) Seguridad adicional: asegúrate que realmente quedó dentro del directorio permitido
+            var finalFullPath = Path.GetFullPath(candidatePath);
+            if (!finalFullPath.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("El archivo resuelto quedó fuera del directorio permitido.");
 
-            if (!string.IsNullOrWhiteSpace(allowedRootDirectory))
-            {
-                var root = Path.GetFullPath(allowedRootDirectory);
-                if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                    throw new UnauthorizedAccessException("La ruta del PDF está fuera del directorio permitido.");
-            }
-
-            var fi = new FileInfo(fullPath);
-            if (fi.Length <= 0)
-                throw new InvalidDataException("El archivo PDF está vacío.");
-            if (fi.Length > maxBytes)
-                throw new InvalidDataException($"El archivo PDF supera el tamaño máximo permitido ({maxBytes} bytes).");
-
-            // Abrimos con FileShare.Read para detectar bloqueos de escritura
-            using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            {
-                // Validaciones de firma PDF y EOF
-                ValidatePdfSignatureAndEof(fs);
-
-                // Lee bytes completos de forma segura (para ≤ 25–50 MB es aceptable en memoria)
-                // Si esperas PDFs muy grandes, implementar codificación streaming con ToBase64Transform.
-                byte[] data = ReadAllBytes(fs);
-
-                // Convertir a Base64 sin saltos de línea (importante para transmitir por JSON)
-                return Convert.ToBase64String(data, Base64FormattingOptions.None);
-            }
+            // 5) Reutiliza las validaciones fuertes del método principal
+            return ToBase64FromPath(finalFullPath, maxBytes, requirePdfExtension, allowedRootDirectory: baseDir);
         }
 
         /// <summary>
-        /// Convierte a Base64 desde un arreglo de bytes que representa un PDF.
+        /// Variante Try* que no lanza excepciones.
         /// </summary>
-        public static string ToBase64FromBytes(byte[] pdfBytes, long maxBytes = 25L * 1024 * 1024)
-        {
-            if (pdfBytes == null || pdfBytes.Length == 0)
-                throw new InvalidDataException("Los bytes del PDF son nulos o vacíos.");
-            if (pdfBytes.LongLength > maxBytes)
-                throw new InvalidDataException($"El PDF en memoria supera el tamaño máximo permitido ({maxBytes} bytes).");
-
-            using (var ms = new MemoryStream(pdfBytes, writable: false))
-            {
-                ValidatePdfSignatureAndEof(ms);
-            }
-
-            return Convert.ToBase64String(pdfBytes, Base64FormattingOptions.None);
-        }
-
-        /// <summary>
-        /// Convierte a Base64 desde un Stream legible que contiene un PDF.
-        /// No cierra el Stream original.
-        /// </summary>
-        public static string ToBase64FromStream(Stream pdfStream, long maxBytes = 25L * 1024 * 1024)
-        {
-            if (pdfStream == null)
-                throw new ArgumentException("El Stream del PDF no puede ser nulo.", nameof(pdfStream));
-            if (!pdfStream.CanRead)
-                throw new IOException("El Stream del PDF no es legible.");
-
-            // Copiamos a MemoryStream para validaciones y conversión
-            using (var ms = new MemoryStream())
-            {
-                pdfStream.Position = 0;
-                pdfStream.CopyTo(ms);
-
-                if (ms.Length <= 0)
-                    throw new InvalidDataException("El Stream del PDF está vacío.");
-                if (ms.Length > maxBytes)
-                    throw new InvalidDataException($"El PDF supera el tamaño máximo permitido ({maxBytes} bytes).");
-
-                ms.Position = 0;
-                ValidatePdfSignatureAndEof(ms);
-
-                var bytes = ms.ToArray();
-                return Convert.ToBase64String(bytes, Base64FormattingOptions.None);
-            }
-        }
-
-        // ================== Utilitarios privados ==================
-
-        private static byte[] ReadAllBytes(FileStream fs)
-        {
-            // Usa el length preconocido para evitar realocaciones
-            var length = checked((int)fs.Length);
-            var buffer = new byte[length];
-            int offset = 0;
-            int read;
-            while ((read = fs.Read(buffer, offset, length - offset)) > 0)
-            {
-                offset += read;
-            }
-            if (offset != length)
-                throw new IOException("No se pudo leer completamente el archivo PDF.");
-            return buffer;
-        }
-
-        /// <summary>
-        /// Verifica que el Stream tenga firma %PDF- al inicio y '%%EOF' cercano al final.
-        /// </summary>
-        private static void ValidatePdfSignatureAndEof(Stream s)
-        {
-            if (!s.CanSeek)
-                throw new IOException("No se puede posicionar el Stream para validar el PDF.");
-
-            // Valida firma "%PDF-"
-            s.Position = 0;
-            var header = new byte[5];
-            int readHeader = s.Read(header, 0, header.Length);
-            if (readHeader < header.Length || header[0] != 0x25 || header[1] != 0x50 || header[2] != 0x44 || header[3] != 0x46 || header[4] != 0x2D) // %PDF-
-                throw new InvalidDataException("El archivo no tiene la firma de un PDF (%PDF-).");
-
-            // Busca '%%EOF' en los últimos ~2 KB (heurística razonable para PDFs bien formados)
-            const int tailScan = 2048;
-            var len = s.Length;
-            var scanSize = (int)Math.Min(tailScan, len);
-            var tail = new byte[scanSize];
-
-            s.Position = len - scanSize;
-            int readTail = s.Read(tail, 0, scanSize);
-            if (readTail <= 0)
-                throw new InvalidDataException("No fue posible leer el final del PDF.");
-
-            var tailText = Encoding.ASCII.GetString(tail, 0, readTail);
-            if (tailText.IndexOf("%%EOF", StringComparison.Ordinal) < 0)
-                throw new InvalidDataException("No se encontró el marcador '%%EOF' al final del PDF.");
-        }
-
-        // ================== Opción Try* sin excepciones ==================
-
-        /// <summary>
-        /// Variante segura que no lanza excepciones. Devuelve true/false y rellena base64 o errorMessage.
-        /// </summary>
-        public static bool TryToBase64FromPath(string pdfPath, out string base64, out string errorMessage,
-            long maxBytes = 25L * 1024 * 1024, bool requirePdfExtension = true, string allowedRootDirectory = null)
+        public static bool TryToBase64FromName(
+            string fileName,
+            string directory,
+            out string base64,
+            out string errorMessage,
+            long maxBytes = 25L * 1024 * 1024,
+            bool requirePdfExtension = true,
+            bool allowCaseInsensitiveSearch = true)
         {
             base64 = null;
             errorMessage = null;
             try
             {
-                base64 = ToBase64FromPath(pdfPath, maxBytes, requirePdfExtension, allowedRootDirectory);
+                base64 = ToBase64FromName(fileName, directory, maxBytes, requirePdfExtension, allowCaseInsensitiveSearch);
                 return true;
             }
             catch (Exception ex)
