@@ -1,30 +1,55 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 
-public static class PdfBase64SimpleHelper
+namespace Domain.Helpers
 {
-    /// <summary>
-    /// Convierte un PDF a Base64.
-    /// </summary>
-    /// <param name="fileName">Nombre del archivo PDF (ej: "Contrato.pdf").</param>
-    /// <param name="directory">Directorio donde está el archivo (ej: @"C:\Banco\Docs").</param>
-    /// <returns>Cadena Base64 del PDF.</returns>
-    public static string ConvertToBase64(string fileName, string directory)
+    public static class AttachmentHelper
     {
-        if (string.IsNullOrWhiteSpace(fileName))
-            throw new ArgumentException("El nombre del archivo no puede ser vacío.", nameof(fileName));
+        /// <summary>
+        /// Convierte un arreglo de bytes en GZip y lo retorna como Base64.
+        /// </summary>
+        /// <param name="fileBytes">Bytes del archivo original.</param>
+        /// <returns>String Base64 del archivo comprimido.</returns>
+        public static string ConvertAttachmentToBase64(byte[] fileBytes)
+        {
+            if (fileBytes == null || fileBytes.Length == 0)
+                throw new ArgumentException("El contenido del archivo no puede estar vacío.", nameof(fileBytes));
 
-        if (string.IsNullOrWhiteSpace(directory))
-            throw new ArgumentException("El directorio no puede ser vacío.", nameof(directory));
+            try
+            {
+                using (var outputStream = new MemoryStream())
+                {
+                    using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal, leaveOpen: true))
+                    {
+                        gzipStream.Write(fileBytes, 0, fileBytes.Length);
+                    }
 
-        // Arma la ruta completa
-        string fullPath = Path.Combine(directory, fileName);
+                    // Convertir a Base64 el resultado comprimido
+                    return Convert.ToBase64String(outputStream.ToArray());
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Error al comprimir el archivo en GZip.", ex);
+            }
+        }
 
-        if (!File.Exists(fullPath))
-            throw new FileNotFoundException("No se encontró el archivo PDF.", fullPath);
+        /// <summary>
+        /// Convierte un archivo (ruta) directamente en GZip Base64.
+        /// </summary>
+        /// <param name="filePath">Ruta del archivo.</param>
+        /// <returns>String Base64 comprimido.</returns>
+        public static string ConvertAttachmentToBase64(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("La ruta del archivo no puede estar vacía.", nameof(filePath));
 
-        // Lee todos los bytes y devuelve Base64
-        byte[] pdfBytes = File.ReadAllBytes(fullPath);
-        return Convert.ToBase64String(pdfBytes, Base64FormattingOptions.None);
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("No se encontró el archivo especificado.", filePath);
+
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            return ConvertAttachmentToBase64(fileBytes);
+        }
     }
 }
