@@ -1,55 +1,36 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 
-namespace Domain.Helpers
+public static class MimeTypeHelper
 {
-    public static class AttachmentHelper
+    private static readonly Dictionary<string, string> _mimeTypes = new()
     {
-        /// <summary>
-        /// Convierte un arreglo de bytes en GZip y lo retorna como Base64.
-        /// </summary>
-        /// <param name="fileBytes">Bytes del archivo original.</param>
-        /// <returns>String Base64 del archivo comprimido.</returns>
-        public static string ConvertAttachmentToBase64(byte[] fileBytes)
+        { ".pdf", "application/pdf" },
+        { ".jpg", "image/jpeg" },
+        { ".jpeg", "image/jpeg" },
+        { ".png", "image/png" },
+        { ".gif", "image/gif" },
+        { ".txt", "text/plain" },
+        { ".csv", "text/csv" },
+        { ".doc", "application/msword" },
+        { ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+        { ".xls", "application/vnd.ms-excel" },
+        { ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+        // Agrega las extensiones que uses frecuentemente
+    };
+
+    public static string GetContentType(string fileName, string fallback = "application/octet-stream")
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return fallback;
+
+        string ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (_mimeTypes.TryGetValue(ext, out string mime))
         {
-            if (fileBytes == null || fileBytes.Length == 0)
-                throw new ArgumentException("El contenido del archivo no puede estar vacío.", nameof(fileBytes));
-
-            try
-            {
-                using (var outputStream = new MemoryStream())
-                {
-                    using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal, leaveOpen: true))
-                    {
-                        gzipStream.Write(fileBytes, 0, fileBytes.Length);
-                    }
-
-                    // Convertir a Base64 el resultado comprimido
-                    return Convert.ToBase64String(outputStream.ToArray());
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException("Error al comprimir el archivo en GZip.", ex);
-            }
+            return mime;
         }
 
-        /// <summary>
-        /// Convierte un archivo (ruta) directamente en GZip Base64.
-        /// </summary>
-        /// <param name="filePath">Ruta del archivo.</param>
-        /// <returns>String Base64 comprimido.</returns>
-        public static string ConvertAttachmentToBase64(string filePath)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-                throw new ArgumentException("La ruta del archivo no puede estar vacía.", nameof(filePath));
-
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("No se encontró el archivo especificado.", filePath);
-
-            byte[] fileBytes = File.ReadAllBytes(filePath);
-            return ConvertAttachmentToBase64(fileBytes);
-        }
+        return fallback; // Si no encuentra la extensión, usa el valor por defecto
     }
 }
