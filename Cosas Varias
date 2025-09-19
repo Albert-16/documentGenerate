@@ -1,36 +1,47 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
-public static class MimeTypeHelper
+public static class AliasSanitizer
 {
-    private static readonly Dictionary<string, string> _mimeTypes = new()
+    /// <summary>
+    /// Normaliza un alias para uso seguro en SMTP: 
+    /// - Elimina tildes, diéresis y convierte Ñ/ñ a N/n.
+    /// - Permite solo letras, dígitos, espacio, guion y punto.
+    /// - Colapsa espacios múltiples y recorta.
+    /// </summary>
+    public static string LimpiarAlias(string alias)
     {
-        { ".pdf", "application/pdf" },
-        { ".jpg", "image/jpeg" },
-        { ".jpeg", "image/jpeg" },
-        { ".png", "image/png" },
-        { ".gif", "image/gif" },
-        { ".txt", "text/plain" },
-        { ".csv", "text/csv" },
-        { ".doc", "application/msword" },
-        { ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-        { ".xls", "application/vnd.ms-excel" },
-        { ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
-        // Agrega las extensiones que uses frecuentemente
-    };
+        if (string.IsNullOrWhiteSpace(alias))
+            return string.Empty;
 
-    public static string GetContentType(string fileName, string fallback = "application/octet-stream")
-    {
-        if (string.IsNullOrWhiteSpace(fileName))
-            return fallback;
+        // Paso 1: Normalizar y eliminar diacríticos
+        string normalizado = alias.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
 
-        string ext = Path.GetExtension(fileName).ToLowerInvariant();
-        if (_mimeTypes.TryGetValue(ext, out string mime))
+        foreach (char c in normalizado)
         {
-            return mime;
+            var categoria = CharUnicodeInfo.GetUnicodeCategory(c);
+
+            // Ignorar acentos
+            if (categoria == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            // Convertir Ñ/ñ a N/n
+            if (c == 'Ñ') { sb.Append('N'); continue; }
+            if (c == 'ñ') { sb.Append('n'); continue; }
+
+            sb.Append(c);
         }
 
-        return fallback; // Si no encuentra la extensión, usa el valor por defecto
+        string sinTildes = sb.ToString().Normalize(NormalizationForm.FormC);
+
+        // Paso 2: Reemplazar cualquier carácter no permitido (solo ASCII letras, números, espacio, guion, punto)
+        string soloValidos = Regex.Replace(sinTildes, @"[^A-Za-z0-9 .-]", string.Empty);
+
+        // Paso 3: Colapsar espacios múltiples y recortar
+        string limpio = Regex.Replace(soloValidos, @"\s{2,}", " ").Trim();
+
+        return limpio;
     }
 }
