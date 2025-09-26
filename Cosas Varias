@@ -1,21 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+using AsmxServiceReference;
 
-  <!-- Paquetes para net8.0 -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.1" />
-  </ItemGroup>
+namespace AsmxServiceSdk;
 
-  <!-- Paquetes para netstandard2.0 (compatibles con .NET Framework 4.7.2) -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
-  </ItemGroup>
-</Project>
+public interface IEmailSenderClient
+{
+    Task<AddTextResponse> AddTextAsync(string guidCode, string shippingDate, string subject, string textBody, CancellationToken ct = default);
+
+    Task<CreateMailResponse> CreateMailAsync(string origin, string system, string template, string language, string to, string from, string subject, string body, CancellationToken ct = default);
+}
+
+public sealed class EmailSenderClient : IEmailSenderClient
+{
+    private readonly WSDL_BAN_MS_12_EmailSenderSoapClient _client;
+
+    public EmailSenderClient(HttpClient httpClient)
+    {
+        // el proxy generado tiene un ctor que recibe HttpClient
+        _client = new WSDL_BAN_MS_12_EmailSenderSoapClient(httpClient);
+    }
+
+    public Task<AddTextResponse> AddTextAsync(string guidCode, string shippingDate, string subject, string textBody, CancellationToken ct = default)
+        => _client.AddTextAsync(guidCode, shippingDate, subject, textBody);
+
+    public Task<CreateMailResponse> CreateMailAsync(string origin, string system, string template, string language, string to, string from, string subject, string body, CancellationToken ct = default)
+        => _client.CreateMailAsync(origin, system, template, language, to, from, subject, body);
+}
