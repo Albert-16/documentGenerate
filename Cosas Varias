@@ -1,47 +1,21 @@
-using System.Globalization;
-using System.Text;
-using System.Text.RegularExpressions;
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
 
-public static class AliasSanitizer
-{
-    /// <summary>
-    /// Normaliza un alias para uso seguro en SMTP: 
-    /// - Elimina tildes, diéresis y convierte Ñ/ñ a N/n.
-    /// - Permite solo letras, dígitos, espacio, guion y punto.
-    /// - Colapsa espacios múltiples y recorta.
-    /// </summary>
-    public static string LimpiarAlias(string alias)
-    {
-        if (string.IsNullOrWhiteSpace(alias))
-            return string.Empty;
+  <!-- Paquetes para net8.0 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.1" />
+  </ItemGroup>
 
-        // Paso 1: Normalizar y eliminar diacríticos
-        string normalizado = alias.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder();
-
-        foreach (char c in normalizado)
-        {
-            var categoria = CharUnicodeInfo.GetUnicodeCategory(c);
-
-            // Ignorar acentos
-            if (categoria == UnicodeCategory.NonSpacingMark)
-                continue;
-
-            // Convertir Ñ/ñ a N/n
-            if (c == 'Ñ') { sb.Append('N'); continue; }
-            if (c == 'ñ') { sb.Append('n'); continue; }
-
-            sb.Append(c);
-        }
-
-        string sinTildes = sb.ToString().Normalize(NormalizationForm.FormC);
-
-        // Paso 2: Reemplazar cualquier carácter no permitido (solo ASCII letras, números, espacio, guion, punto)
-        string soloValidos = Regex.Replace(sinTildes, @"[^A-Za-z0-9 .-]", string.Empty);
-
-        // Paso 3: Colapsar espacios múltiples y recortar
-        string limpio = Regex.Replace(soloValidos, @"\s{2,}", " ").Trim();
-
-        return limpio;
-    }
-}
+  <!-- Paquetes para netstandard2.0 (compatibles con .NET Framework 4.7.2) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
+  </ItemGroup>
+</Project>
