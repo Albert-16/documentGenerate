@@ -1,34 +1,56 @@
-<div style="font-family: Arial, Helvetica, sans-serif; background-color: #f8f9fa; padding: 30px;">
-  <div style="max-width: 600px; margin: auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 30px;">
-    <div style="text-align: center; margin-bottom: 25px;">
-      <img src="https://www.davivienda.hn/Content/images/logo-davivienda.png" alt="Davivienda Honduras" width="180">
-      <hr style="border: none; border-top: 2px solid #E41E26; margin-top: 15px;">
-    </div>
+<?xml version="1.0" encoding="utf-8"?>
+<Document xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="C:\MigradocPlantillas\SchemaMigradoc.xsd">
 
-    <p style="font-size: 14px; color: #333333; line-height: 1.6;">
-      <strong>Apreciado cliente,</strong><br><br>
-      <strong>[NOMBRE]</strong><br><br>
-      Le confirmamos que hemos activado su <strong>Cuenta Móvil Davivienda</strong>. A continuación, encontrará información importante sobre este producto:
-    </p>
+  <Section PageSetup.PageWidth="21cm"
+           PageSetup.PageHeight="29.7cm"
+           PageSetup.Orientation="Portrait"
+           PageSetup.TopMargin="1.5cm"
+           PageSetup.BottomMargin="1.5cm"
+           PageSetup.LeftMargin="2cm"
+           PageSetup.RightMargin="2cm">
 
-    <ul style="font-size: 14px; color: #333333; line-height: 1.6;">
-      <li><strong>Tipo de Cuenta:</strong> Cuenta</li>
-      <li><strong>Planilla Monto Mínimo de Creación:</strong> L 20.00</li>
-    </ul>
+    <!-- Título principal -->
+    <Paragraph Style="Heading1" Format.Alignment="Center">
+      <Text>Firma de Aceptación del Cliente, producto Tarjeta de Crédito</Text>
+    </Paragraph>
 
-    <p style="font-size: 14px; color: #333333; line-height: 1.6;">
-      Adjunto en este correo encontrará el <strong>contrato de productos y servicios</strong> como documento de respaldo. 
-      Recuerde que, a través de nuestras plataformas digitales 
-      <strong><span style="color:#E41E26;">APP Davivienda Honduras</span></strong> y 
-      <strong><span style="color:#E41E26;">Banca en Línea</span></strong>, 
-      puede realizar consultas de saldos, transacciones, pagos y muchos otros servicios de forma fácil y segura, 
-      en cualquier momento y desde cualquier lugar.
-    </p>
+    <Paragraph>
+      <Text> </Text> <!-- espacio -->
+    </Paragraph>
 
-    <p style="font-size: 14px; color: #333333; margin-top: 30px;">
-      Atentamente,<br><br>
-      <strong style="color:#E41E26;">DAVIVIENDA HONDURAS</strong><br>
-      <span style="font-size:12px; color:#555555;">"Somos parte de su vida"</span>
-    </p>
-  </div>
-</div>
+    <!-- Línea de datos del cliente -->
+    <Table Borders.Width="0.25pt" Borders.Color="Black">
+      <Columns>
+        <Column Width="10cm"/>
+        <Column Width="5cm"/>
+      </Columns>
+      <Rows>
+        <Row>
+          <Cell>
+            <Paragraph>
+              <Text>4303-XXXX-XXXX-3674  NELYI LARICE</Text>
+            </Paragraph>
+          </Cell>
+        </Row>
+      </Rows>
+    </Table>
+
+    <Paragraph>
+      <Text> </Text> <!-- Espacio -->
+    </Paragraph>
+
+    <!-- Bloque de dirección de domicilio -->
+    <Paragraph Style="Heading2">
+      <Text>Dirección de Domicilio</Text>
+    </Paragraph>
+
+    <Paragraph>
+      <Text>LOMAS DE TONCONTIN S28 VILLA SAN JORGE BLOQUE B CASA #17</Text>
+    </Paragraph>
+    <Paragraph>
+      <Text>CASA COLOR GRIS DE UNA PLANTA DISTRITO CENTRAL FRANCISCO MORAZÁN</Text>
+    </Paragraph>
+
+  </Section>
+</Document>
