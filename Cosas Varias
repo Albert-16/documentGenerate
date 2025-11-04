@@ -1,115 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Document xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:noNamespaceSchemaLocation="C:\MigradocPlantillas\SchemaMigradoc.xsd">
+using DocumentFormat.OpenXml.Packaging;
+using OpenXmlPowerTools;
+using System.Xml.Linq;
+using System.IO;
 
-  <Section>
-    <PageSetup>
-      <PageWidth>21cm</PageWidth>
-      <PageHeight>29.7cm</PageHeight>
-      <TopMargin>1.5cm</TopMargin>
-      <BottomMargin>1.5cm</BottomMargin>
-      <LeftMargin>2cm</LeftMargin>
-      <RightMargin>2cm</RightMargin>
-    </PageSetup>
+public static class DocxToHtmlHelper
+{
+    public static string ConvertDocxToHtml(string inputDocxPath)
+    {
+        using (WordprocessingDocument wDoc = WordprocessingDocument.Open(inputDocxPath, false))
+        {
+            var settings = new HtmlConverterSettings()
+            {
+                PageTitle = Path.GetFileNameWithoutExtension(inputDocxPath)
+            };
 
-    <!-- Encabezado principal -->
-    <p align="center" style="Heading1">
-      Firma de Aceptación del Cliente, producto Tarjeta de Crédito
-    </p>
-
-    <p> </p>
-
-    <!-- Contenedor principal tipo caja -->
-    <Table Borders.Width="0.5pt" Borders.Color="Black">
-      <Column Width="15cm"/>
-
-      <!-- Número de tarjeta y nombre -->
-      <Row>
-        <Cell>
-          <p>4303-XXXX-XXXX-3674&nbsp;&nbsp;NELYI LARICE</p>
-        </Cell>
-      </Row>
-
-      <!-- Dirección de domicilio -->
-      <Row>
-        <Cell>
-          <p><b>Dirección de Domicilio</b></p>
-          <p>LOMAS DE TONCONTIN S28 VILLA SAN JORGE BLOQUE B CASA #17</p>
-          <p>CASA COLOR GRIS DE UNA PLANTA DISTRITO CENTRAL FRANCISCO MORAZÁN</p>
-        </Cell>
-      </Row>
-
-      <!-- Dirección de trabajo -->
-      <Row>
-        <Cell>
-          <p><b>Dirección de Trabajo</b></p>
-          <p>UNE TV Cargo: PERIODISTA</p>
-          <p>LOMAS DE MAYAB S10 CALLE LOS PRESIDENTES CASA #2819</p>
-          <p>ATRÁS DE RESTAURANTE MC DONALS DISTRITO CENTRAL FRANCISCO MORAZÁN</p>
-        </Cell>
-      </Row>
-
-      <!-- Teléfonos -->
-      <Row>
-        <Cell>
-          <Table Borders.Width="0pt">
-            <Column Width="7cm"/>
-            <Column Width="8cm"/>
-            <Row>
-              <Cell><p>Teléfono de Casa: 0</p></Cell>
-              <Cell><p>Nombre de Quien Recibe:</p></Cell>
-            </Row>
-            <Row>
-              <Cell><p>Teléfono de Oficina: 22706200</p></Cell>
-              <Cell><p>Tipo: N</p></Cell>
-            </Row>
-            <Row>
-              <Cell><p>Teléfono Celular: 99707012</p></Cell>
-              <Cell><p>Identidad:</p></Cell>
-            </Row>
-          </Table>
-        </Cell>
-      </Row>
-
-      <!-- Certificación -->
-      <Row>
-        <Cell>
-          <p>Certifico haber recibido PIN de TDC en su sobre de seguridad sellado</p>
-        </Cell>
-      </Row>
-
-      <!-- Fecha de corte -->
-      <Row>
-        <Cell>
-          <p>Su fecha de corte es 16 de cada mes.</p>
-        </Cell>
-      </Row>
-
-      <!-- Firma -->
-      <Row>
-        <Cell>
-          <Table Borders.Width="0pt">
-            <Column Width="7.5cm"/>
-            <Column Width="7.5cm"/>
-            <Row>
-              <Cell><p>_________________________</p></Cell>
-              <Cell><p>_________________________</p></Cell>
-            </Row>
-            <Row>
-              <Cell><p>Fecha</p></Cell>
-              <Cell><p>Firma</p></Cell>
-            </Row>
-          </Table>
-        </Cell>
-      </Row>
-    </Table>
-
-    <p> </p>
-
-    <!-- Texto final -->
-    <p>
-      El CLIENTE con la presente firma certifica la solicitud electrónica de Tarjeta de Crédito, acepta las condiciones establecidas por el Banco y se responsabiliza del uso adecuado de la misma.
-    </p>
-
-  </Section>
-</Document>
+            XElement html = HtmlConverter.ConvertToHtml(wDoc, settings);
+            return html.ToString(SaveOptions.DisableFormatting);
+        }
+    }
+}
