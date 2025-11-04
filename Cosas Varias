@@ -1,21 +1,43 @@
-using DocumentFormat.OpenXml.Packaging;
-using OpenXmlPowerTools;
-using System.Xml.Linq;
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.Rendering;
+using HtmlAgilityPack;
 using System.IO;
 
-public static class DocxToHtmlHelper
+public static class HtmlToPdfHelper
 {
-    public static string ConvertDocxToHtml(string inputDocxPath)
+    public static void ConvertHtmlToPdf(string htmlContent, string outputPdfPath)
     {
-        using (WordprocessingDocument wDoc = WordprocessingDocument.Open(inputDocxPath, false))
-        {
-            var settings = new HtmlConverterSettings()
-            {
-                PageTitle = Path.GetFileNameWithoutExtension(inputDocxPath)
-            };
+        var htmlDoc = new HtmlDocument();
+        htmlDoc.LoadHtml(htmlContent);
 
-            XElement html = HtmlConverter.ConvertToHtml(wDoc, settings);
-            return html.ToString(SaveOptions.DisableFormatting);
+        var document = new Document();
+        var section = document.AddSection();
+        section.PageSetup.TopMargin = Unit.FromCentimeter(2);
+        section.PageSetup.BottomMargin = Unit.FromCentimeter(2);
+        section.PageSetup.LeftMargin = Unit.FromCentimeter(2);
+        section.PageSetup.RightMargin = Unit.FromCentimeter(2);
+
+        foreach (var node in htmlDoc.DocumentNode.SelectNodes("//p | //h1 | //h2 | //h3 | //table"))
+        {
+            if (node.Name == "p")
+            {
+                var paragraph = section.AddParagraph(node.InnerText);
+                paragraph.Format.SpaceAfter = "4pt";
+            }
+            else if (node.Name.StartsWith("h"))
+            {
+                var paragraph = section.AddParagraph(node.InnerText);
+                paragraph.Format.Font.Bold = true;
+                paragraph.Format.SpaceAfter = "6pt";
+            }
+            // puedes expandir aquí soporte para <table>, <b>, <i>, etc.
         }
+
+        var pdfRenderer = new PdfDocumentRenderer(true)
+        {
+            Document = document
+        };
+        pdfRenderer.RenderDocument();
+        pdfRenderer.Save(outputPdfPath);
     }
 }
