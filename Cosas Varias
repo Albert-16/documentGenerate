@@ -1,43 +1,34 @@
-using MigraDoc.DocumentObjectModel;
-using MigraDoc.Rendering;
-using HtmlAgilityPack;
-using System.IO;
+using DinkToPdf;
+using DinkToPdf.Contracts;
 
-public static class HtmlToPdfHelper
+namespace Infrastructure.Helpers
 {
-    public static void ConvertHtmlToPdf(string htmlContent, string outputPdfPath)
+    public static class HtmlToPdfHelper
     {
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(htmlContent);
-
-        var document = new Document();
-        var section = document.AddSection();
-        section.PageSetup.TopMargin = Unit.FromCentimeter(2);
-        section.PageSetup.BottomMargin = Unit.FromCentimeter(2);
-        section.PageSetup.LeftMargin = Unit.FromCentimeter(2);
-        section.PageSetup.RightMargin = Unit.FromCentimeter(2);
-
-        foreach (var node in htmlDoc.DocumentNode.SelectNodes("//p | //h1 | //h2 | //h3 | //table"))
+        public static void ConvertHtmlToPdf(string htmlContent, string outputPdfPath)
         {
-            if (node.Name == "p")
+            var converter = new SynchronizedConverter(new PdfTools());
+            var doc = new HtmlToPdfDocument()
             {
-                var paragraph = section.AddParagraph(node.InnerText);
-                paragraph.Format.SpaceAfter = "4pt";
-            }
-            else if (node.Name.StartsWith("h"))
-            {
-                var paragraph = section.AddParagraph(node.InnerText);
-                paragraph.Format.Font.Bold = true;
-                paragraph.Format.SpaceAfter = "6pt";
-            }
-            // puedes expandir aquí soporte para <table>, <b>, <i>, etc.
+                GlobalSettings = {
+                    ColorMode = ColorMode.Color,
+                    Orientation = Orientation.Portrait,
+                    PaperSize = PaperKind.A4,
+                    Margins = new MarginSettings { Top = 20, Bottom = 20, Left = 20, Right = 20 },
+                    Out = outputPdfPath
+                },
+                Objects = {
+                    new ObjectSettings()
+                    {
+                        HtmlContent = htmlContent,
+                        WebSettings = { DefaultEncoding = "utf-8", LoadImages = true, EnableJavascript = true },
+                        HeaderSettings = { FontSize = 9, Right = "Página [page]/[toPage]", Line = false },
+                        FooterSettings = { FontSize = 9, Center = "Documento generado automáticamente", Line = true }
+                    }
+                }
+            };
+
+            converter.Convert(doc);
         }
-
-        var pdfRenderer = new PdfDocumentRenderer(true)
-        {
-            Document = document
-        };
-        pdfRenderer.RenderDocument();
-        pdfRenderer.Save(outputPdfPath);
     }
 }
