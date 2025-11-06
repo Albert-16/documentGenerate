@@ -1,34 +1,92 @@
-using DinkToPdf;
-using DinkToPdf.Contracts;
+using Domain.Entities;
+using Infrastructure.Helpers;
+using System.Data;
 
-namespace Infrastructure.Helpers
+namespace Application.Services
 {
-    public static class HtmlToPdfHelper
+    public class CorreoProcessor
     {
-        public static void ConvertHtmlToPdf(string htmlContent, string outputPdfPath)
-        {
-            var converter = new SynchronizedConverter(new PdfTools());
-            var doc = new HtmlToPdfDocument()
-            {
-                GlobalSettings = {
-                    ColorMode = ColorMode.Color,
-                    Orientation = Orientation.Portrait,
-                    PaperSize = PaperKind.A4,
-                    Margins = new MarginSettings { Top = 20, Bottom = 20, Left = 20, Right = 20 },
-                    Out = outputPdfPath
-                },
-                Objects = {
-                    new ObjectSettings()
-                    {
-                        HtmlContent = htmlContent,
-                        WebSettings = { DefaultEncoding = "utf-8", LoadImages = true, EnableJavascript = true },
-                        HeaderSettings = { FontSize = 9, Right = "Página [page]/[toPage]", Line = false },
-                        FooterSettings = { FontSize = 9, Center = "Documento generado automáticamente", Line = true }
-                    }
-                }
-            };
+        private readonly DatabaseGeneric _database;
+        private readonly MailHelper _mailHelper;
 
-            converter.Convert(doc);
+        public CorreoProcessor(DatabaseGeneric database)
+        {
+            _database = database;
+            _mailHelper = new MailHelper();
+        }
+
+        public async Task ProcesarEnvioCorreosAsync(bool masivo, string? id = null)
+        {
+            var registros = await GetCorreosPendientesAsync(masivo, id);
+
+            if (registros.Count == 0)
+            {
+                Console.WriteLine("No hay correos pendientes para enviar.");
+                return;
+            }
+
+            await Parallel.ForEachAsync(registros, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (r, token) =>
+            {
+                try
+                {
+                    await _mailHelper.SendMailAsync(
+                        r.GCTDC09005!,
+                        r.GCTDC09006!,
+                        r.GCTDC09002!,
+                        r.GCTDC09004!
+                    );
+
+                    await ActualizarEstadoEnvioAsync(r.GCTDC09001!, 1);
+                    Console.WriteLine($"✅ Correo enviado a {r.GCTDC09006}");
+                }
+                catch (Exception ex)
+                {
+                    await ActualizarEstadoEnvioAsync(r.GCTDC09001!, 2);
+                    Console.WriteLine($"❌ Error con {r.GCTDC09006}: {ex.Message}");
+                }
+            });
+        }
+
+        private async Task<List<GCTDC09Li>> GetCorreosPendientesAsync(bool masivo, string? id = null)
+        {
+            string query = masivo
+                ? "SELECT * FROM EVRETCDTA.GCTDC09LI WHERE GCTDC09011 = '0'"
+                : $"SELECT * FROM EVRETCDTA.GCTDC09LI WHERE GCTDC09001 = '{id}'";
+
+            var dt = await _database.GetDataTableAsync(query, DatabaseTypes.AS400);
+            var list = new List<GCTDC09Li>();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                list.Add(new GCTDC09Li
+                {
+                    GCTDC09001 = row["GCTDC09001"].ToString(),
+                    GCTDC09002 = row["GCTDC09002"].ToString(),
+                    GCTDC09003 = row["GCTDC09003"].ToString(),
+                    GCTDC09004 = row["GCTDC09004"].ToString(),
+                    GCTDC09005 = row["GCTDC09005"].ToString(),
+                    GCTDC09006 = row["GCTDC09006"].ToString(),
+                    GCTDC09007 = row["GCTDC09007"].ToString(),
+                    GCTDC09008 = row["GCTDC09008"].ToString(),
+                    GCTDC09009 = row["GCTDC09009"].ToString(),
+                    GCTDC09010 = row["GCTDC09010"].ToString(),
+                    GCTDC09011 = row["GCTDC09011"].ToString(),
+                });
+            }
+
+            return list;
+        }
+
+        private async Task ActualizarEstadoEnvioAsync(string idDocumento, int estado)
+        {
+            string query = $@"
+                UPDATE EVRETCDTA.GCTDC09LI
+                SET GCTDC09011 = '{estado}',
+                    GCTDC09009 = '{DateTime.Now:yyyyMMdd}',
+                    GCTDC09010 = '{DateTime.Now:HHmmss}'
+                WHERE GCTDC09001 = '{idDocumento}'";
+
+            await _database.ExecuteNonQueryAsync(query, DatabaseTypes.AS400);
         }
     }
 }
