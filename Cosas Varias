@@ -1,92 +1,71 @@
-using Domain.Entities;
-using Infrastructure.Helpers;
-using System.Data;
+using System;
+using System.IO;
+using HiQPdf;
 
-namespace Application.Services
+namespace Infrastructure.Helpers.PdfConverters
 {
-    public class CorreoProcessor
+    public class DocxToPdfConverter
     {
-        private readonly DatabaseGeneric _database;
-        private readonly MailHelper _mailHelper;
+        private readonly string _licenseKey;
 
-        public CorreoProcessor(DatabaseGeneric database)
+        public DocxToPdfConverter(string licenseKey)
         {
-            _database = database;
-            _mailHelper = new MailHelper();
+            if (string.IsNullOrEmpty(licenseKey))
+                throw new ArgumentNullException(nameof(licenseKey), "La licencia de HiQPdf no puede ser nula o vacía.");
+
+            _licenseKey = licenseKey;
+            HiQPdf.License.SetLicenseKey(_licenseKey);
         }
 
-        public async Task ProcesarEnvioCorreosAsync(bool masivo, string? id = null)
+        /// <summary>
+        /// Convierte un archivo DOCX a PDF usando HiQPdf.
+        /// </summary>
+        /// <param name="inputDocxPath">Ruta completa del archivo DOCX de origen.</param>
+        /// <param name="outputPdfPath">Ruta completa donde se guardará el PDF generado.</param>
+        public void ConvertDocxToPdf(string inputDocxPath, string outputPdfPath)
         {
-            var registros = await GetCorreosPendientesAsync(masivo, id);
+            if (!File.Exists(inputDocxPath))
+                throw new FileNotFoundException("El archivo DOCX no fue encontrado.", inputDocxPath);
 
-            if (registros.Count == 0)
+            try
             {
-                Console.WriteLine("No hay correos pendientes para enviar.");
-                return;
+                // Crear instancia del convertidor de DOCX a PDF
+                DocxToPdfConverter docxConverter = new DocxToPdfConverter();
+                HiQPdf.License.SetLicenseKey(_licenseKey);
+
+                byte[] pdfBytes = docxConverter.ConvertToPdf(File.ReadAllBytes(inputDocxPath));
+
+                // Guardar el resultado en disco
+                File.WriteAllBytes(outputPdfPath, pdfBytes);
             }
-
-            await Parallel.ForEachAsync(registros, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (r, token) =>
+            catch (Exception ex)
             {
-                try
-                {
-                    await _mailHelper.SendMailAsync(
-                        r.GCTDC09005!,
-                        r.GCTDC09006!,
-                        r.GCTDC09002!,
-                        r.GCTDC09004!
-                    );
-
-                    await ActualizarEstadoEnvioAsync(r.GCTDC09001!, 1);
-                    Console.WriteLine($"✅ Correo enviado a {r.GCTDC09006}");
-                }
-                catch (Exception ex)
-                {
-                    await ActualizarEstadoEnvioAsync(r.GCTDC09001!, 2);
-                    Console.WriteLine($"❌ Error con {r.GCTDC09006}: {ex.Message}");
-                }
-            });
-        }
-
-        private async Task<List<GCTDC09Li>> GetCorreosPendientesAsync(bool masivo, string? id = null)
-        {
-            string query = masivo
-                ? "SELECT * FROM EVRETCDTA.GCTDC09LI WHERE GCTDC09011 = '0'"
-                : $"SELECT * FROM EVRETCDTA.GCTDC09LI WHERE GCTDC09001 = '{id}'";
-
-            var dt = await _database.GetDataTableAsync(query, DatabaseTypes.AS400);
-            var list = new List<GCTDC09Li>();
-
-            foreach (DataRow row in dt.Rows)
-            {
-                list.Add(new GCTDC09Li
-                {
-                    GCTDC09001 = row["GCTDC09001"].ToString(),
-                    GCTDC09002 = row["GCTDC09002"].ToString(),
-                    GCTDC09003 = row["GCTDC09003"].ToString(),
-                    GCTDC09004 = row["GCTDC09004"].ToString(),
-                    GCTDC09005 = row["GCTDC09005"].ToString(),
-                    GCTDC09006 = row["GCTDC09006"].ToString(),
-                    GCTDC09007 = row["GCTDC09007"].ToString(),
-                    GCTDC09008 = row["GCTDC09008"].ToString(),
-                    GCTDC09009 = row["GCTDC09009"].ToString(),
-                    GCTDC09010 = row["GCTDC09010"].ToString(),
-                    GCTDC09011 = row["GCTDC09011"].ToString(),
-                });
+                throw new InvalidOperationException($"Error al convertir el archivo DOCX a PDF: {ex.Message}", ex);
             }
-
-            return list;
         }
 
-        private async Task ActualizarEstadoEnvioAsync(string idDocumento, int estado)
+        /// <summary>
+        /// Convierte un archivo DOCX a PDF y devuelve el PDF como arreglo de bytes.
+        /// Ideal para respuestas HTTP o bases de datos.
+        /// </summary>
+        public byte[] ConvertDocxToPdf(byte[] docxBytes)
         {
-            string query = $@"
-                UPDATE EVRETCDTA.GCTDC09LI
-                SET GCTDC09011 = '{estado}',
-                    GCTDC09009 = '{DateTime.Now:yyyyMMdd}',
-                    GCTDC09010 = '{DateTime.Now:HHmmss}'
-                WHERE GCTDC09001 = '{idDocumento}'";
+            if (docxBytes == null || docxBytes.Length == 0)
+                throw new ArgumentException("El contenido del archivo DOCX está vacío.");
 
-            await _database.ExecuteNonQueryAsync(query, DatabaseTypes.AS400);
+            try
+            {
+                HiQPdf.License.SetLicenseKey(_licenseKey);
+
+                // Convertir a PDF
+                var converter = new DocxToPdfConverter();
+                byte[] pdfBytes = converter.ConvertToPdf(docxBytes);
+                return pdfBytes;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Error al convertir DOCX a PDF: {ex.Message}", ex);
+            }
         }
     }
 }
