@@ -1,71 +1,70 @@
 using System;
 using System.IO;
-using HiQPdf;
+using HiQPdf.NetCore;
 
 namespace Infrastructure.Helpers.PdfConverters
 {
-    public class DocxToPdfConverter
+    public class HiqDocxToPdfConverter
     {
         private readonly string _licenseKey;
 
-        public DocxToPdfConverter(string licenseKey)
+        public HiqDocxToPdfConverter(string licenseKey)
         {
-            if (string.IsNullOrEmpty(licenseKey))
-                throw new ArgumentNullException(nameof(licenseKey), "La licencia de HiQPdf no puede ser nula o vacía.");
+            if (string.IsNullOrWhiteSpace(licenseKey))
+                throw new ArgumentException("La clave de licencia de HiQPdf no puede ser nula o vacía.", nameof(licenseKey));
 
             _licenseKey = licenseKey;
-            HiQPdf.License.SetLicenseKey(_licenseKey);
+            HiQPdf.NetCore.License.SetLicenseKey(_licenseKey);
         }
 
         /// <summary>
-        /// Convierte un archivo DOCX a PDF usando HiQPdf.
+        /// Convierte un archivo DOCX en PDF y lo guarda en disco.
         /// </summary>
-        /// <param name="inputDocxPath">Ruta completa del archivo DOCX de origen.</param>
-        /// <param name="outputPdfPath">Ruta completa donde se guardará el PDF generado.</param>
         public void ConvertDocxToPdf(string inputDocxPath, string outputPdfPath)
         {
             if (!File.Exists(inputDocxPath))
-                throw new FileNotFoundException("El archivo DOCX no fue encontrado.", inputDocxPath);
+                throw new FileNotFoundException("No se encontró el archivo DOCX.", inputDocxPath);
 
             try
             {
-                // Crear instancia del convertidor de DOCX a PDF
-                DocxToPdfConverter docxConverter = new DocxToPdfConverter();
-                HiQPdf.License.SetLicenseKey(_licenseKey);
+                var converter = new HiQPdf.NetCore.DocxToPdf();
+                var pdfBytes = converter.ConvertToPdf(File.ReadAllBytes(inputDocxPath));
 
-                byte[] pdfBytes = docxConverter.ConvertToPdf(File.ReadAllBytes(inputDocxPath));
-
-                // Guardar el resultado en disco
                 File.WriteAllBytes(outputPdfPath, pdfBytes);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Error al convertir el archivo DOCX a PDF: {ex.Message}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Convierte un archivo DOCX a PDF y devuelve el PDF como arreglo de bytes.
-        /// Ideal para respuestas HTTP o bases de datos.
-        /// </summary>
-        public byte[] ConvertDocxToPdf(byte[] docxBytes)
-        {
-            if (docxBytes == null || docxBytes.Length == 0)
-                throw new ArgumentException("El contenido del archivo DOCX está vacío.");
-
-            try
-            {
-                HiQPdf.License.SetLicenseKey(_licenseKey);
-
-                // Convertir a PDF
-                var converter = new DocxToPdfConverter();
-                byte[] pdfBytes = converter.ConvertToPdf(docxBytes);
-                return pdfBytes;
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException($"Error al convertir DOCX a PDF: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Convierte un archivo DOCX a PDF y devuelve el resultado como arreglo de bytes.
+        /// Ideal para APIs o almacenamiento temporal.
+        /// </summary>
+        public byte[] ConvertDocxToPdf(byte[] docxBytes)
+        {
+            if (docxBytes == null || docxBytes.Length == 0)
+                throw new ArgumentException("El contenido DOCX está vacío.");
+
+            try
+            {
+                var converter = new HiQPdf.NetCore.DocxToPdf();
+                return converter.ConvertToPdf(docxBytes);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Error al convertir DOCX a PDF: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Convierte un DOCX a PDF y devuelve un stream listo para enviar en un endpoint.
+        /// </summary>
+        public MemoryStream ConvertDocxToPdfStream(byte[] docxBytes)
+        {
+            var pdfBytes = ConvertDocxToPdf(docxBytes);
+            return new MemoryStream(pdfBytes);
         }
     }
 }
