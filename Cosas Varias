@@ -1,49 +1,71 @@
-using System;
-using System.IO;
-using HiQPdf.Chromium;
+<div style="background-color:#f4f5f7;padding:20px 0;font-family:Arial, Helvetica, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" 
+               style="background-color:#ffffff;border-radius:8px;
+                      box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
+          <!-- Encabezado -->
+          <tr>
+            <td style="background-color:#e30613;padding:16px 24px;text-align:left;">
+              <!-- Reemplazar por logo si se desea -->
+              <span style="color:#ffffff;font-size:18px;font-weight:bold;">
+                Contrato Digital – Tarjeta de Crédito
+              </span>
+            </td>
+          </tr>
 
-namespace Infrastructure.Helpers.PdfConverters
-{
-    public class HiqDocxToPdfConverter
-    {
-        private readonly string _licenseKey;
+          <!-- Cuerpo -->
+          <tr>
+            <td style="padding:24px 28px;color:#333333;font-size:14px;line-height:1.6;">
+              
+              <p style="margin:0 0 12px 0;">
+                Estimado(a) Sr./Sra. <strong>[Apellido del cliente]</strong>:
+              </p>
 
-        public HiqDocxToPdfConverter(string licenseKey)
-        {
-            if (string.IsNullOrWhiteSpace(licenseKey))
-                throw new ArgumentException("La clave de licencia no puede estar vacía.", nameof(licenseKey));
+              <p style="margin:0 0 12px 0;">
+                Reciba un cordial saludo.
+              </p>
 
-            _licenseKey = licenseKey;
-            // Establecer licencia (dependiendo de la versión)
-            Licensing.SerialNumber = _licenseKey;  // o License.SetLicenseKey(...), verifica en tu versión
-        }
+              <p style="margin:0 0 12px 0;">
+                En atención a su solicitud de tarjeta de crédito 
+                <strong>[Visa / Mastercard] [Oro / Clásica / etc.]</strong> en 
+                <strong>[Dólares / Davipuntos / etc.]</strong>, le remitimos el 
+                <strong>contrato digital</strong> correspondiente para su lectura y resguardo.
+              </p>
 
-        public void ConvertDocxToPdf(string inputDocxPath, string outputPdfPath)
-        {
-            if (!File.Exists(inputDocxPath))
-                throw new FileNotFoundException("Archivo DOCX no encontrado.", inputDocxPath);
+              <p style="margin:0 0 16px 0;">
+                <strong>Monto aprobado:</strong> L <strong>[Monto del límite]</strong>
+              </p>
 
-            var converter = new WordToPdfConverter();
+              <p style="margin:0 0 12px 0;">
+                Es muy importante que revise detenidamente el contenido del contrato.
+                Si tiene alguna consulta, por favor no dude en plantearla cuando nuestros 
+                gestores de mensajería se comuniquen con usted para coordinar la entrega de su tarjeta,
+                o a través de nuestros canales de atención habituales.
+              </p>
 
-            // Opcional: ajustar configuración
-            converter.PdfDocumentOptions.UsePageSettingsFromWord = true;
-            converter.ProcessPageBreakMarks = true;
+              <p style="margin:16px 0 4px 0;">
+                Atentamente,
+              </p>
+              <p style="margin:0 0 16px 0;font-weight:bold;">
+                [Nombre del área / unidad responsable]
+              </p>
 
-            byte[] pdfBytes = converter.ConvertToPdf(inputDocxPath);
+              <hr style="border:none;border-top:1px solid #e0e0e0;margin:12px 0 16px 0;">
 
-            File.WriteAllBytes(outputPdfPath, pdfBytes);
-        }
+              <p style="margin:0;font-size:12px;color:#777777;line-height:1.5;">
+                Los beneficios, condiciones y detalles del servicio pueden consultarse en nuestro sitio web:<br>
+                <a href="https://www.davivienda.com.hn" target="_blank" 
+                   style="color:#e30613;text-decoration:none;font-weight:bold;">
+                  www.davivienda.com.hn
+                </a>
+              </p>
 
-        public byte[] ConvertDocxToPdf(byte[] docxBytes)
-        {
-            if (docxBytes == null || docxBytes.Length == 0)
-                throw new ArgumentException("El contenido DOCX está vacío.", nameof(docxBytes));
-
-            var converter = new WordToPdfConverter();
-            converter.PdfDocumentOptions.UsePageSettingsFromWord = true;
-            converter.ProcessPageBreakMarks = true;
-
-            return converter.ConvertToPdf(docxBytes);
-        }
-    }
-}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
