@@ -1,24 +1,28 @@
-<div style="background-color:#f4f5f7;padding:20px 0;font-family:Arial, Helvetica, sans-serif;">
+<!-- CONTENEDOR CON AIRE -->
+<div style="padding:24px 16px; background-color:#f4f5f7; font-family:Arial, Helvetica, sans-serif;">
+
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="600" 
+
+        <!-- TARJETA -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600"
                style="background-color:#ffffff;border-radius:8px;
                       box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
-          <!-- Encabezado -->
+          
+          <!-- ENCABEZADO ROJO -->
           <tr>
-            <td style="background-color:#e30613;padding:16px 24px;text-align:left;">
-              <!-- Reemplazar por logo si se desea -->
-              <span style="color:#ffffff;font-size:18px;font-weight:bold;">
+            <td style="background-color:#e30613;padding:14px 24px;text-align:center;">
+              <span style="color:#ffffff;font-size:17px;font-weight:bold;">
                 Contrato Digital – Tarjeta de Crédito
               </span>
             </td>
           </tr>
 
-          <!-- Cuerpo -->
+          <!-- CUERPO CON PADDING INTERNO -->
           <tr>
-            <td style="padding:24px 28px;color:#333333;font-size:14px;line-height:1.6;">
-              
+            <td style="padding:22px 28px;color:#333333;font-size:14px;line-height:1.6;">
+
               <p style="margin:0 0 12px 0;">
                 Estimado(a) Sr./Sra. <strong>[Apellido del cliente]</strong>:
               </p>
@@ -52,7 +56,7 @@
                 [Nombre del área / unidad responsable]
               </p>
 
-              <hr style="border:none;border-top:1px solid #e0e0e0;margin:12px 0 16px 0;">
+              <hr style="border:none;border-top:1px solid #e0e0e0;margin:8px 0 14px 0;">
 
               <p style="margin:0;font-size:12px;color:#777777;line-height:1.5;">
                 Los beneficios, condiciones y detalles del servicio pueden consultarse en nuestro sitio web:<br>
@@ -65,7 +69,10 @@
             </td>
           </tr>
         </table>
+        <!-- /TARJETA -->
+
       </td>
     </tr>
   </table>
 </div>
+<!-- /CONTENEDOR -->
