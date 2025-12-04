@@ -1,78 +1,240 @@
-<!-- CONTENEDOR CON AIRE -->
-<div style="padding:24px 16px; background-color:#f4f5f7; font-family:Arial, Helvetica, sans-serif;">
+Análisis Funcional – Servicio de Cobro Automático de Comisiones
 
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-    <tr>
-      <td align="center">
+El requerimiento establece la construcción de un servicio batch que se ejecute diariamente y determine si, para la fecha del día, existe una comisión configurada según lo definido en el Requerimiento Funcional 3 (RF3). El servicio deberá identificar uno o varios cobros programados y ejecutar la correspondiente partida contable, debitando la cuenta del cliente y registrando la comisión según las reglas de negocio establecidas.
 
-        <!-- TARJETA -->
-        <table role="presentation" cellpadding="0" cellspacing="0" width="600"
-               style="background-color:#ffffff;border-radius:8px;
-                      box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
-          
-          <!-- ENCABEZADO ROJO -->
-          <tr>
-            <td style="background-color:#e30613;padding:14px 24px;text-align:center;">
-              <span style="color:#ffffff;font-size:17px;font-weight:bold;">
-                Contrato Digital – Tarjeta de Crédito
-              </span>
-            </td>
-          </tr>
+Si la comisión está configurada en dólares (USD), el sistema deberá convertir el monto a LPS antes de generar el asiento, utilizando las cuentas contables definidas para comisiones varias (LPS 521990006). Cada registro a contabilizar deberá formarse con los datos definidos en la estructura: centro de costo del cliente, cuenta de afectación, y los campos informativos requeridos (CIF, tipo de comisión y descripciones asociadas).
 
-          <!-- CUERPO CON PADDING INTERNO -->
-          <tr>
-            <td style="padding:22px 28px;color:#333333;font-size:14px;line-height:1.6;">
+El asiento contable incluirá un débito por el valor de la comisión a la cuenta indicada por el usuario en RF3 y el crédito a la cuenta estándar definida para el servicio. En caso de no existir fondos suficientes en la cuenta del cliente, el monto deberá trasladarse a la cuenta 243990001 – Acree Varios Ctas en Suspenso, manteniendo el centro de costo del cliente al que se intentó cargar el débito. Asimismo, se recalca el uso obligatorio de “pipes” para evitar la aplicación de TSP sobre la transacción.
 
-              <p style="margin:0 0 12px 0;">
-                Estimado(a) Sr./Sra. <strong>[Apellido del cliente]</strong>:
-              </p>
+Finalmente, el proceso deberá registrar toda la ejecución conforme a los criterios contables del banco, asegurando correcta conversión de moneda, validaciones de fondos, aplicación de reglas del día y consistencia de la información utilizada para auditoría y conciliación.
 
-              <p style="margin:0 0 12px 0;">
-                Reciba un cordial saludo.
-              </p>
 
-              <p style="margin:0 0 12px 0;">
-                En atención a su solicitud de tarjeta de crédito 
-                <strong>[Visa / Mastercard] [Oro / Clásica / etc.]</strong> en 
-                <strong>[Dólares / Davipuntos / etc.]</strong>, le remitimos el 
-                <strong>contrato digital</strong> correspondiente para su lectura y resguardo.
-              </p>
+**Análisis Funcional – Requerimiento Funcional 5 (RF5)
 
-              <p style="margin:0 0 16px 0;">
-                <strong>Monto aprobado:</strong> L <strong>[Monto del límite]</strong>
-              </p>
+Servicio de posteo de depósitos con fecha valor**
 
-              <p style="margin:0 0 12px 0;">
-                Es muy importante que revise detenidamente el contenido del contrato.
-                Si tiene alguna consulta, por favor no dude en plantearla cuando nuestros 
-                gestores de mensajería se comuniquen con usted para coordinar la entrega de su tarjeta,
-                o a través de nuestros canales de atención habituales.
-              </p>
+El requerimiento define la implementación de un servicio que permitirá a Prosegur realizar el posteo de depósitos con fecha valor, enviando la información mediante un request que incluye el campo Teller (primeros 12 dígitos del Código de Dispositivo), parametrizado previamente en el RF2. Este Teller es fundamental para identificar las cuentas configuradas para dicho buzón, de acuerdo con la moneda en la que se recibe el depósito.
 
-              <p style="margin:16px 0 4px 0;">
-                Atentamente,
-              </p>
-              <p style="margin:0 0 16px 0;font-weight:bold;">
-                [Nombre del área / unidad responsable]
-              </p>
+El servicio deberá interpretar la estructura del request enviada por Prosegur, validar el Teller recibido y obtener las cuentas asociadas para procesar el depósito en la moneda correspondiente (LPS o USD). Para depósitos en USD, el sistema deberá validar las reglas definidas en los módulos de “Cumplimiento” y “Mantenimiento Efectivo Dólar”, asegurando que la operación cumpla las disposiciones regulatorias antes de permitir el posteo.
 
-              <hr style="border:none;border-top:1px solid #e0e0e0;margin:8px 0 14px 0;">
+El proceso deberá registrar correctamente la transacción, aplicando la fecha valor indicada y asignando los campos incluidos en el request (cliente, cuenta, monto, dispositivo, hora y demás metadatos enviados). El objetivo es garantizar que cada depósito se aplique de manera confiable, siguiendo las configuraciones definidas por Davivienda y manteniendo la integridad contable y operativa del servicio.
 
-              <p style="margin:0;font-size:12px;color:#777777;line-height:1.5;">
-                Los beneficios, condiciones y detalles del servicio pueden consultarse en nuestro sitio web:<br>
-                <a href="https://www.davivienda.com.hn" target="_blank" 
-                   style="color:#e30613;text-decoration:none;font-weight:bold;">
-                  www.davivienda.com.hn
-                </a>
-              </p>
 
-            </td>
-          </tr>
-        </table>
-        <!-- /TARJETA -->
 
-      </td>
-    </tr>
-  </table>
-</div>
-<!-- /CONTENEDOR -->
+Análisis Funcional – Posteo contable de depósitos con fecha valor
+
+Para el Servicio de posteo de depósitos con fecha valor (RF5) se define el uso del Perfil Transerver con las cuentas contables:
+
+Moneda nacional: BZON_INTLPS
+
+Moneda extranjera: BUZONINTLUSD
+
+
+Al recibir un depósito, el sistema deberá generar automáticamente la partida contable siguiendo la estructura indicada: el centro de costo corresponde al de la cuenta del cliente, la cuenta de afectación es la cuenta del cliente configurada para ese dispositivo, y la descripción se construye con los campos BI-Teller ID, Receipt Number y demás datos provenientes del request. El débito se registra sobre la cuenta control asignada al producto y el crédito sobre la cuenta del cliente por el monto del depósito.
+
+Para depósitos en Lempiras, el sistema acreditará la cuenta del cliente (ahorros/cheques) y debitará la cuenta control 1620001312 con centro de costo 162. Para depósitos en dólares, acreditará la cuenta del cliente en USD y debitará la cuenta control 1620001320, también con centro de costo 162. Adicionalmente, todas las transacciones en dólares deberán ser grabadas a nivel de intertrading en la opción 781392 – Menú Internacional, con el fin de cumplir con los requerimientos de reporte al BCH. El nombre del cliente utilizado en los registros deberá obtenerse a partir del CIF del beneficiario, garantizando consistencia entre la información operativa y contable.
+
+
+Análisis Funcional – Procesos Operativos Buzones Inteligentes
+
+El requerimiento define la creación de una función operativa en aplicaciones externas (788818) denominada Cuadre y Conciliación Buzones Inteligentes Prosegur, cuyo objetivo es permitir la gestión de clientes, máquinas virtuales (buzones), su estado operativo y la conciliación de depósitos recibidos.
+
+1. Funcionalidad principal del menú
+
+La pantalla inicial presentará dos opciones operativas:
+
+1. Detalle de clientes
+
+
+2. Reportes y conciliación
+
+
+
+Estas opciones permiten consultar clientes con buzones configurados y revisar depósitos recibidos con su estado (pendiente o conciliado).
+
+
+---
+
+2. Detalle de clientes
+
+Al seleccionar esta opción, el sistema mostrará criterios de búsqueda para localizar clientes que posean buzones inteligentes activos o inactivos.
+La búsqueda puede realizarse por:
+
+CIF del cliente
+
+Nombre del cliente (nombre corto)
+
+
+Una vez seleccionado el cliente, el sistema mostrará:
+
+Total de buzones configurados
+
+Estado actual de cada máquina (activa / inactiva)
+
+Información de alta: fecha, número de máquina, zona, tienda, usuario que configuró
+
+
+
+---
+
+3. Inactivación de máquinas virtuales
+
+El sistema deberá permitir inactivar una máquina siempre que no existan depósitos pendientes de conciliación.
+
+Al presionar I – Inactivar, el sistema:
+
+Cambia el estatus del buzón a inactivo
+
+Registra trazabilidad:
+
+Fecha de alta
+
+Usuario que configuró
+
+Número de máquina
+
+Zona y tienda
+
+Usuario que inactiva
+
+Fecha y hora de inactivación
+
+
+
+Esta información deberá mostrarse en pantalla como parte del Log de cambios.
+
+
+---
+
+4. Visualización de buzones y actualización de estatus
+
+El sistema debe permitir visualizar todos los buzones asociados al cliente mostrando:
+
+Fecha de alta
+
+Número de máquina
+
+Zona de ubicación
+
+Nombre de tienda
+
+Estatus actual (Activa / Inactiva)
+
+
+Al actualizar la pantalla, el sistema reflejará los cambios recientes aplicados al estatus del buzón.
+
+Restricciones importantes:
+
+1. No se podrá dar de baja o inactivar un buzón si tiene depósitos pendientes de conciliación.
+
+
+2. El estatus determina si la máquina está autorizada a recibir depósitos.
+
+
+
+
+---
+
+5. Reportes y conciliación de depósitos
+
+Seleccionada una fecha específica, el sistema debe mostrar todos los depósitos recibidos en LPS o USD, reflejando los siguientes campos:
+
+1. Fecha de transacción – Derivada del tag Transaction_datetime
+
+
+2. Número de cuenta – Depende del Teller ID y la cuenta configurada
+
+
+3. Identificador de la transacción – Tag TransactionId
+
+
+4. Número de ticket – Tag ReceiptNumber
+
+
+5. Moneda – Tag Totals_Total_Currency
+
+
+6. Monto – Tag Totals_Total_Amount
+
+
+7. Estatus – Inicialmente siempre “Pendiente”
+
+
+
+
+---
+
+6. Conciliación automática
+
+Para que el sistema pueda cambiar el estatus de pendiente a conciliado, se requiere integrar un mecanismo mediante archivos cargados en GoAnyWhere, creando 6 carpetas correspondientes a cada tesorería.
+
+En estas carpetas se cargarán archivos Excel enviados manualmente por Prosegur, que incluirán información clave para la conciliación:
+
+Número de depósito
+
+Monto
+
+Fecha
+
+Datos de referencia necesarios para emparejar contra los valores recibidos por máquinas inteligentes
+
+
+El sistema deberá procesar estos archivos y actualizar automáticamente el estatus de los depósitos coincidentes.
+
+
+---
+
+Objetivo general del requerimiento
+
+Implementar un módulo operativo que permita:
+
+Gestionar clientes y máquinas configuradas para Buzón Inteligente
+
+Controlar el estatus operativo de máquinas
+
+Registrar trazabilidad de cambios
+
+Consultar depósitos recibidos por fecha
+
+Conciliar depósitos con información enviada por Prosegur
+
+Garantizar restricciones operativas (no permitir inactivación con depósitos pendientes)
+
+
+
+
+**Análisis Funcional – RF9
+
+Registro de Transacciones en Efectivo RTE por depósitos iguales o superiores a L 200,000.00 o $4,000.00**
+
+El requerimiento establece que el sistema debe registrar automáticamente en el módulo de Lavado de Activos todas las transacciones en efectivo provenientes de Buzones Inteligentes cuyo monto sea mayor o igual a L 200,000.00 o mayor o igual a $4,000.00.
+
+Este registro debe realizarse en la opción 781200 – Transacciones / Referencias / Cobranzas, programa LAVAD00EFVO – Registro de Transacciones en Efectivo, siguiendo los parámetros definidos por el banco para efectos de cumplimiento regulatorio.
+
+El sistema deberá validar que las transacciones se registren utilizando los perfiles contables correctos para cada moneda:
+
+TSBUZONINT_LPS para montos en Lempiras
+
+TSBUZONINT_USD para montos en Dólares
+
+
+Estos perfiles garantizan que el centro de costo, cuenta afectada y clasificación de la transacción cumplan con lo requerido por las normativas de prevención de lavado de activos y la UIF.
+
+Una vez enviado el registro, el sistema mostrará la transacción en la bandeja operativa correspondiente al centro de costo y cajero configurados. Al digitar estos parámetros junto con la fecha, el sistema mostrará todas las transacciones RTE pendientes de completar, revisar o imprimir, tal como se realiza en el proceso operativo estándar de reporte a la UIF.
+
+Este requerimiento asegura que los depósitos de alto valor realizados a través de las máquinas de Prosegur sean reportados adecuadamente, manteniendo consistencia con las reglas de cumplimiento y reduciendo riesgos de omisión en el control de operaciones relevantes.
+
+
+Conexión web service con Prosegur
+
+El requerimiento establece la implementación y configuración de la integración vía servicios web REST entre Davivienda y Prosegur en los tres ambientes del banco: Integración, UAT y Producción. La solución debe habilitar el consumo de los servicios expuestos por Prosegur (p. ej. posteo de depósitos, consulta de saldos CASH BALANCE y otros servicios relacionados con las máquinas de Buzón Inteligente), utilizando las URLs y parámetros técnicos definidos en la documentación compartida.
+
+Funcionalmente, el sistema de Davivienda deberá:
+
+Configurar, por ambiente, las URLs de API Proxy y del servicio de obtención de token (OAuth 2.0), utilizando las credenciales de cliente asignadas.
+
+Implementar el flujo de autenticación por token temporal, realizando un POST al endpoint de token y luego consumiendo los servicios de Prosegur con dicho token en el encabezado de autorización.
+
+Gestionar la parametrización de endpoints, timeouts y manejo de errores de comunicación, asegurando trazabilidad de cada request/response.
+
+Garantizar que la conexión cumpla los lineamientos de seguridad, cifrado y segregación por ambiente, de acuerdo con la arquitectura del banco.
