@@ -1,39 +1,34 @@
-public async Task ActualizarEstadoEnvioBatchAsync(IEnumerable<(string IdDocumento, int Estado)> items)
+using System.Data;
+using Dapper;
+
+// Supongamos que tienes una lista de resultados con el ID y el estado final.
+var resultados = new List<(string IdDocumento, int Estado)>
 {
-    const string sql = @"
+    ("doc1", 0),
+    ("doc2", 91),
+    // ... otros registros
+};
+
+// Construyes la consulta SQL con CASE WHEN
+string sql = @"
 UPDATE EVERTECDTA.GCTDC09L1
-   SET GCTDC09014 = ?,
-       GCTDC09007 = ?,
-       GCTDC09008 = ?
- WHERE GCTDC09001 = ?";
+   SET GCTDC09014 = CASE GCTDC09001
+";
 
-    // Si tu conexión es OleDb (AS400), es mejor con '?' por orden (posicional)
-    // Dapper con OleDb usa parámetros posicionales.
+foreach (var resultado in resultados)
+{
+    sql += $"    WHEN '{resultado.IdDocumento}' THEN {resultado.Estado}\n";
+}
 
-    if (_connection.State != ConnectionState.Open)
-        _connection.Open();
+sql += @"
+   END
+ WHERE GCTDC09001 IN @Ids";
 
-    using var tx = _connection.BeginTransaction();
+var ids = resultados.Select(r => r.IdDocumento).ToArray();
 
-    try
-    {
-        var now = DateTime.Now;
-        var fecha = now.ToString("yyyyMMdd");
-        var hora  = now.ToString("HHmmss");
-
-        foreach (var it in items)
-        {
-            await _connection.ExecuteAsync(
-                sql,
-                new object[] { it.Estado, fecha, hora, it.IdDocumento },
-                tx);
-        }
-
-        tx.Commit();
-    }
-    catch
-    {
-        tx.Rollback();
-        throw;
-    }
+// Luego ejecutas la consulta una sola vez
+using (var connection = new OleDbConnection("tu_cadena_de_conexion"))
+{
+    connection.Open();
+    connection.Execute(sql, new { Ids = ids });
 }
