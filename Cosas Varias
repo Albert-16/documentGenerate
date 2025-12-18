@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -10,13 +11,15 @@ public async Task ActualizarEstadoEnvioBatchAsync(
     int chunkSize = 200,
     int commandTimeout = 60)
 {
+    var runId = Guid.NewGuid().ToString("N");
+
     if (items == null)
     {
-        _logger.Information("BatchUpdate: items viene null.");
+        _logger.Information("BatchUpdate[{RunId}]: items viene null. No se ejecuta.", runId);
         return;
     }
 
-    // Limpieza + deduplicación por ID (se queda con el último estado)
+    // Limpieza + dedupe (se queda con el último estado por ID)
     var lista = items
         .Where(x => !string.IsNullOrWhiteSpace(x.IdDocumento))
         .Select(x => (IdDocumento: x.IdDocumento.Trim(), x.Estado))
@@ -26,30 +29,36 @@ public async Task ActualizarEstadoEnvioBatchAsync(
 
     if (lista.Count == 0)
     {
-        _logger.Information("BatchUpdate: lista vacía.");
+        _logger.Information("BatchUpdate[{RunId}]: lista vacía. No se ejecuta.", runId);
         return;
     }
 
     var now   = DateTime.Now;
-    var fecha = now.ToString("yyyyMMdd"); // 8
-    var hora  = now.ToString("HHmmss");   // 6
+    var fecha = now.ToString("yyyyMMdd"); // CHAR(8)
+    var hora  = now.ToString("HHmmss");   // CHAR(6)
 
     if (_database.Connection.State != ConnectionState.Open)
         _database.Connect();
 
-    _logger.Information("BatchUpdate: inicia. TotalUnicos={Total} ChunkSize={ChunkSize} Fecha={Fecha} Hora={Hora}",
-        lista.Count, chunkSize, fecha, hora);
+    var totalSw = Stopwatch.StartNew();
 
-    for (int offset = 0; offset < lista.Count; offset += chunkSize)
+    _logger.Information(
+        "BatchUpdate[{RunId}]: inicia. TotalUnicos={Total} ChunkSize={ChunkSize} Fecha={Fecha} Hora={Hora}",
+        runId, lista.Count, chunkSize, fecha, hora);
+
+    try
     {
-        var chunk = lista.Skip(offset).Take(chunkSize).ToList();
+        for (int offset = 0; offset < lista.Count; offset += chunkSize)
+        {
+            var chunk = lista.Skip(offset).Take(chunkSize).ToList();
+            var firstId = chunk.First().IdDocumento;
+            var lastId  = chunk.Last().IdDocumento;
 
-        // IMPORTANTE: IBM i a veces exige tipo en VALUES -> CAST
-        // Y el provider OleDb se lleva mejor con CHAR fijo.
-        var valuesSql = string.Join(",\n",
-            chunk.Select(_ => "(CAST(? AS CHAR(100)), CAST(? AS SMALLINT))"));
+            // SQL: MERGE + VALUES con CAST (IBM i pide tipos)
+            var valuesSql = string.Join(",\n",
+                chunk.Select(_ => "(CAST(? AS CHAR(100)), CAST(? AS SMALLINT))"));
 
-        var sql = $@"
+            var sql = $@"
 MERGE INTO EVERTECDTA.GCTDC09L1 T
 USING (VALUES
 {valuesSql}
@@ -62,37 +71,72 @@ WHEN MATCHED THEN
     T.GCTDC09008 = CAST(? AS CHAR(6))
 ";
 
-        var p = new DynamicParameters();
+            var p = new DynamicParameters();
 
-        // Parámetros por ORDEN (OleDb es posicional).
-        // Pero Dapper necesita nombres únicos.
-        for (int i = 0; i < chunk.Count; i++)
-        {
-            var id = chunk[i].IdDocumento;
-            if (id.Length > 100) id = id.Substring(0, 100);
+            // Parámetros por orden (OleDb es posicional)
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var id = chunk[i].IdDocumento;
+                if (id.Length > 100) id = id.Substring(0, 100);
 
-            // ID: CHAR(100)
-            p.Add($"id{i}", id, dbType: DbType.AnsiStringFixedLength, size: 100);
+                p.Add($"id{i}", id, dbType: DbType.AnsiStringFixedLength, size: 100);
+                p.Add($"st{i}", (short)chunk[i].Estado, dbType: DbType.Int16);
+            }
 
-            // Estado: SMALLINT (int16)
-            p.Add($"st{i}", (short)chunk[i].Estado, dbType: DbType.Int16);
+            p.Add("fecha", fecha, dbType: DbType.AnsiStringFixedLength, size: 8);
+            p.Add("hora",  hora,  dbType: DbType.AnsiStringFixedLength, size: 6);
+
+            // Logs “útiles” por chunk
+            _logger.Information(
+                "BatchUpdate[{RunId}]: chunk {Ini}-{Fin} IDs '{First}'..'{Last}' Count={Count}",
+                runId, offset + 1, offset + chunk.Count, firstId, lastId, chunk.Count);
+
+            var chunkSw = Stopwatch.StartNew();
+
+            try
+            {
+                // Diagnóstico (solo útil si falla, pero lo dejamos por ahora)
+                var qCount = sql.Count(c => c == '?');
+                var pCount = p.ParameterNames.Count();
+                _logger.Information("BatchUpdate[{RunId}]: chunk {Ini}-{Fin} ?={QCount} Params={PCount}",
+                    runId, offset + 1, offset + chunk.Count, qCount, pCount);
+
+                var affected = await _database.Connection.ExecuteAsync(sql, p, commandTimeout: commandTimeout);
+
+                chunkSw.Stop();
+
+                _logger.Information(
+                    "BatchUpdate[{RunId}]: chunk {Ini}-{Fin} OK. Affected={Affected} Ms={Ms}",
+                    runId, offset + 1, offset + chunk.Count, affected, chunkSw.ElapsedMilliseconds);
+            }
+            catch (Exception exChunk)
+            {
+                chunkSw.Stop();
+
+                // Preview de IDs (limitado)
+                var idsPreview = string.Join(", ", chunk.Take(10).Select(x => x.IdDocumento));
+
+                var qCount = sql.Count(c => c == '?');
+                var pCount = p.ParameterNames.Count();
+
+                _logger.Information(
+                    "BatchUpdate[{RunId}]: ERROR chunk {Ini}-{Fin}. ?={QCount} Params={PCount} IdsPreview=[{IdsPreview}] Ms={Ms} Error={Error}",
+                    runId, offset + 1, offset + chunk.Count, qCount, pCount, idsPreview, chunkSw.ElapsedMilliseconds, exChunk.Message);
+
+                throw;
+            }
         }
 
-        // Fecha / Hora
-        p.Add("fecha", fecha, dbType: DbType.AnsiStringFixedLength, size: 8);
-        p.Add("hora",  hora,  dbType: DbType.AnsiStringFixedLength, size: 6);
-
-        // Logs de diagnóstico (útiles si vuelve a fallar)
-        var qCount = sql.Count(c => c == '?');
-        var pCount = p.ParameterNames.Count();
-        _logger.Information("BatchUpdate: chunk {Ini}-{Fin} ?={QCount} Params={PCount}",
-            offset + 1, offset + chunk.Count, qCount, pCount);
-
-        var affected = await _database.Connection.ExecuteAsync(sql, p, commandTimeout: commandTimeout);
-
-        _logger.Information("BatchUpdate: chunk {Ini}-{Fin} OK. Registros={Count}. Affected={Affected}",
-            offset + 1, offset + chunk.Count, chunk.Count, affected);
+        totalSw.Stop();
+        _logger.Information("BatchUpdate[{RunId}]: finaliza OK. TotalUnicos={Total} TotalMs={Ms}",
+            runId, lista.Count, totalSw.ElapsedMilliseconds);
     }
-
-    _logger.Information("BatchUpdate: finaliza OK. TotalUnicos={Total}", lista.Count);
+    catch (Exception ex)
+    {
+        totalSw.Stop();
+        _logger.Information("BatchUpdate[{RunId}]: finaliza con ERROR. TotalUnicos={Total} TotalMs={Ms} Error={Error}",
+            runId, lista.Count, totalSw.ElapsedMilliseconds, ex.Message);
+        throw;
+    }
 }
+```0
