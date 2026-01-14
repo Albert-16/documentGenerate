@@ -1,7 +1,35 @@
+USE control_inventario_ti;
+GO
+
+-- 1. Ver los dos registros duplicados de Certificación
+SELECT 
+    state_id,
+    state_name,
+    create_at,
+    modify_at
+FROM dbo.states
+WHERE state_name = 'Certificación'
+ORDER BY create_at;
+GO
+
+-- 2. Encontrar todas las tablas relacionadas
 SELECT 
     OBJECT_NAME(fk.parent_object_id) AS tabla_relacionada,
     COL_NAME(fc.parent_object_id, fc.parent_column_id) AS columna_fk
 FROM sys.foreign_keys AS fk
 INNER JOIN sys.foreign_key_columns AS fc 
     ON fk.object_id = fc.constraint_object_id
-WHERE OBJECT_NAME(fk.referenced_object_id) = 'states'
+WHERE OBJECT_NAME(fk.referenced_object_id) = 'states';
+GO
+
+-- 3. Ver cuántos registros hay en cada tabla para cada state_id
+-- (Reemplaza 'tasks' con las tablas que retorne el query anterior)
+DECLARE @StateOld UNIQUEIDENTIFIER = '9641077E-76F4-4FC9-8337-A6AD8FD807D8';
+DECLARE @StateNew UNIQUEIDENTIFIER = 'C2AF7ABE-EBD1-4471-B7BB-3FE9DF44AFFE';
+
+-- Ejemplo (ajustar según tus tablas)
+SELECT 'tasks' AS tabla, state_id, COUNT(*) AS total
+FROM dbo.tasks
+WHERE state_id IN (@StateOld, @StateNew)
+GROUP BY state_id;
+GO
