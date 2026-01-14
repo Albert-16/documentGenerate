@@ -1,28 +1,7 @@
-using System;
-using System.Text;
-
-static string DecodeBase64Safe(string input)
-{
-    if (string.IsNullOrWhiteSpace(input)) return "";
-
-    // limpia espacios/saltos de línea
-    var s = input.Trim().Replace("\r", "").Replace("\n", "").Replace(" ", "");
-
-    // corrige padding si falta
-    int mod = s.Length % 4;
-    if (mod != 0) s = s.PadRight(s.Length + (4 - mod), '=');
-
-    try
-    {
-        var bytes = Convert.FromBase64String(s);
-        return Encoding.UTF8.GetString(bytes);
-    }
-    catch
-    {
-        // si no era base64 válido, devuelve el original (o lanza error si prefieres)
-        return input;
-    }
-}
-
-// Uso:
-DavMail.Params = DecodeBase64Safe(dato.GetValue("EML11PARM"));
+SELECT 
+    OBJECT_NAME(fk.parent_object_id) AS tabla_relacionada,
+    COL_NAME(fc.parent_object_id, fc.parent_column_id) AS columna_fk
+FROM sys.foreign_keys AS fk
+INNER JOIN sys.foreign_key_columns AS fc 
+    ON fk.object_id = fc.constraint_object_id
+WHERE OBJECT_NAME(fk.referenced_object_id) = 'states'
