@@ -1,239 +1,81 @@
-¡Ah! Ahora sí veo el panorama completo en PRODUCCIÓN. Esto cambia todo:
-📊 Situación REAL en Producción:
-Ambos states tienen datos:
-9641077E-76F4-4FC9-8337-A6AD8FD807D8 (más antiguo, 2025-01-29) → 1 registro en state_entities
-C2AF7ABE-EBD1-4471-B7BB-3FE9DF44AFFE (más reciente, 2025-09-16) → 1 registro en state_entities
-Total: 2 registros que necesitan consolidarse.
-🎯 Estrategia actualizada:
-Deberíamos mantener el más ANTIGUO (9641077E...) porque:
-Fue el primero en crearse (2025-01-29)
-Representa el state "original"
-Menos riesgo de romper referencias históricas
-📝 Script de migración ACTUALIZADO:
-Reemplaza tu migración con este script corregido:
-using Microsoft.EntityFrameworkCore.Migrations;
-
-#nullable disable
-
-namespace ManageAdmin.Migrations.Data
+@if (hasRequestedMoreInfo && StatusName == "En revisión")
 {
-    public partial class RemoveDuplicateState : Migration
-    {
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            // IDs identificados en producción
-            var stateToKeep = "9641077E-76F4-4FC9-8337-A6AD8FD807D8";    // Más antiguo (MANTENER)
-            var stateToRemove = "C2AF7ABE-EBD1-4471-B7BB-3FE9DF44AFFE";  // Más reciente (ELIMINAR)
-
-            // 1. Verificar que ambos registros existen
-            // ============================================================
-            migrationBuilder.Sql($@"
-                IF NOT EXISTS (SELECT 1 FROM dbo.states WHERE state_id = '{stateToKeep}')
-                BEGIN
-                    RAISERROR('ERROR: El state a mantener (más antiguo) no existe en la BD', 16, 1);
-                    RETURN;
-                END
-
-                IF NOT EXISTS (SELECT 1 FROM dbo.states WHERE state_id = '{stateToRemove}')
-                BEGIN
-                    PRINT 'AVISO: El state duplicado (más reciente) ya no existe. Migración omitida.';
-                    RETURN;
-                END
-                
-                PRINT '========================================';
-                PRINT 'Iniciando consolidación de estados duplicados';
-                PRINT 'State a mantener (antiguo): {stateToKeep}';
-                PRINT 'State a eliminar (reciente): {stateToRemove}';
-                PRINT '========================================';
-            ");
-
-            // 2. Contar registros antes de la migración
-            // ============================================================
-            migrationBuilder.Sql($@"
-                DECLARE @CountOld INT = (SELECT COUNT(*) FROM dbo.state_entities WHERE state_id = '{stateToKeep}');
-                DECLARE @CountNew INT = (SELECT COUNT(*) FROM dbo.state_entities WHERE state_id = '{stateToRemove}');
-                
-                PRINT 'Registros en state_entities ANTES de migración:';
-                PRINT '  - State antiguo (mantener): ' + CAST(@CountOld AS VARCHAR(10));
-                PRINT '  - State reciente (eliminar): ' + CAST(@CountNew AS VARCHAR(10));
-                PRINT '  - Total: ' + CAST((@CountOld + @CountNew) AS VARCHAR(10));
-            ");
-
-            // 3. Migrar registros de state_entities del nuevo al antiguo
-            // ============================================================
-            migrationBuilder.Sql($@"
-                -- Migrar todos los registros del state reciente al antiguo
-                UPDATE dbo.state_entities 
-                SET state_id = '{stateToKeep}'
-                WHERE state_id = '{stateToRemove}';
-                
-                PRINT 'Registros migrados desde state reciente: ' + CAST(@@ROWCOUNT AS VARCHAR(10));
-                
-                -- Verificar total después de la migración
-                DECLARE @TotalAfter INT = (SELECT COUNT(*) FROM dbo.state_entities WHERE state_id = '{stateToKeep}');
-                PRINT 'Total de registros en state antiguo después de migración: ' + CAST(@TotalAfter AS VARCHAR(10));
-            ");
-
-            // 4. Verificar que no quedan referencias al state reciente
-            // ============================================================
-            migrationBuilder.Sql($@"
-                IF EXISTS (SELECT 1 FROM dbo.state_entities WHERE state_id = '{stateToRemove}')
-                BEGIN
-                    RAISERROR('ERROR: Aún existen referencias en state_entities al state que se intenta eliminar', 16, 1);
-                    RETURN;
-                END
-                
-                PRINT 'Verificación OK: No quedan referencias al state reciente';
-            ");
-
-            // 5. Eliminar el registro duplicado (más reciente)
-            // ============================================================
-            migrationBuilder.Sql($@"
-                DELETE FROM dbo.states 
-                WHERE state_id = '{stateToRemove}';
-                
-                IF @@ROWCOUNT = 1
-                BEGIN
-                    PRINT 'Estado duplicado eliminado correctamente';
-                END
-                ELSE
-                BEGIN
-                    RAISERROR('ERROR: No se pudo eliminar el state duplicado', 16, 1);
-                    RETURN;
-                END
-            ");
-
-            // 6. Crear índice único para prevenir duplicados futuros
-            // ============================================================
-            migrationBuilder.CreateIndex(
-                name: "IX_States_StateName_Unique",
-                table: "states",
-                column: "state_name",
-                unique: true);
-            
-            migrationBuilder.Sql($@"
-                PRINT '========================================';
-                PRINT 'Consolidación completada exitosamente';
-                PRINT 'Índice único creado: IX_States_StateName_Unique';
-                PRINT 'Estado mantenido: {stateToKeep} (2025-01-29)';
-                PRINT 'Estado eliminado: {stateToRemove} (2025-09-16)';
-                PRINT 'Total de state_entities consolidados: 2';
-                PRINT '========================================';
-            ");
-        }
-
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            // Rollback: eliminar el índice único
-            migrationBuilder.DropIndex(
-                name: "IX_States_StateName_Unique",
-                table: "states");
-            
-            migrationBuilder.Sql(@"
-                PRINT 'Rollback ejecutado: Índice único eliminado';
-                PRINT 'ADVERTENCIA: Los datos consolidados NO se pueden deshacer automáticamente';
-                PRINT 'Es necesario restaurar desde backup si se requiere revertir la consolidación';
-            ");
-        }
-    }
+    <div class="info-request-indicator @GetInfoRequestUrgencyClass()">
+        <div class="info-request-content">
+            <div class="info-request-dot"></div>
+            <div class="info-request-text">
+                <span class="requester-name">@lastInfoRequestedBy</span>
+                ha solicitado más información a
+                <span class="requestee-name">@ApprovalRequest.ApprovalsUserAuto.User_name</span>
+                <span class="info-request-time">• @GetInfoRequestRelativeTime()</span>
+            </div>
+        </div>
+    </div>
 }
-🔍 Validación adicional ANTES de aplicar:
-Ejecuta esto en producción para confirmar los datos:
-USE control_inventario_ti;
-GO
 
--- Ver los registros actuales en cada state
-SELECT 
-    s.state_id,
-    s.state_name,
-    s.create_at,
-    COUNT(se.id) as total_entities  -- Ajusta 'id' según el nombre real de la PK
-FROM dbo.states s
-LEFT JOIN dbo.state_entities se ON s.state_id = se.state_id
-WHERE s.state_name = 'Certificación'
-GROUP BY s.state_id, s.state_name, s.create_at
-ORDER BY s.create_at;
-GO
 
--- Ver detalles de los registros en state_entities
-SELECT 
-    se.*,
-    s.state_name
-FROM dbo.state_entities se
-INNER JOIN dbo.states s ON se.state_id = s.state_id
-WHERE s.state_name = 'Certificación'
-ORDER BY se.state_id;
-GO
-📋 Plan de ejecución actualizado:
-1. En DESARROLLO (prueba primero aquí):
-Si tu desarrollo no tiene datos, simúlalos:
--- Solo si necesitas simular el escenario en desarrollo
-USE control_inventario_ti;
-GO
 
--- Insertar un registro dummy en cada state
-INSERT INTO dbo.state_entities (state_id, /* otras columnas */)
-VALUES 
-    ('9641077E-76F4-4FC9-8337-A6AD8FD807D8', /* valores */),
-    ('C2AF7ABE-EBD1-4471-B7BB-3FE9DF44AFFE', /* valores */);
-Luego aplica la migración:
-Update-Database
-2. En PRODUCCIÓN:
-A. Backup (OBLIGATORIO):
-USE master;
-GO
 
-BACKUP DATABASE control_inventario_ti 
-TO DISK = 'C:\Backups\control_inventario_ti_PreConsolidacion_$(Get-Date -Format ''yyyyMMdd_HHmmss'').bak'
-WITH COMPRESSION, INIT, 
-     NAME = 'Backup antes de consolidar Certificación duplicada',
-     DESCRIPTION = 'Backup con 2 registros en state_entities antes de consolidación';
-GO
-B. Generar script SQL para revisión:
-dotnet ef migrations script --project ManageAdmin.Migrations --idempotent --output consolidacion_certificacion.sql
-C. Aplicar migración:
-Update-Database
-D. Validar resultado:
-USE control_inventario_ti;
-GO
 
--- 1. Verificar que solo queda UN state de Certificación
-SELECT state_id, state_name, create_at, modify_at
-FROM dbo.states
-WHERE state_name = 'Certificación';
--- Debe retornar SOLO: 9641077E-76F4-4FC9-8337-A6AD8FD807D8
+.info-request-indicator {
+    margin: 12px 0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    transition: all 0.2s ease;
+}
 
--- 2. Verificar que todos los registros están consolidados
-SELECT state_id, COUNT(*) AS total
-FROM dbo.state_entities
-WHERE state_id = '9641077E-76F4-4FC9-8337-A6AD8FD807D8'
-GROUP BY state_id;
--- Debe retornar: 2 registros (consolidados)
+.info-request-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
 
--- 3. Verificar que no hay huérfanos
-SELECT COUNT(*) AS huerfanos
-FROM dbo.state_entities
-WHERE state_id = 'C2AF7ABE-EBD1-4471-B7BB-3FE9DF44AFFE';
--- Debe retornar: 0
+.info-request-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
 
--- 4. Verificar índice único
-SELECT i.name, i.is_unique
-FROM sys.indexes i
-WHERE i.object_id = OBJECT_ID('dbo.states')
-  AND i.name = 'IX_States_StateName_Unique';
--- Debe retornar: IX_States_StateName_Unique, is_unique = 1
+.info-request-text {
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.4;
+}
 
-PRINT 'Validación completada: Todo correcto ✓';
-🎯 Resumen de lo que hará el script:
-✅ Verifica que ambos states existen
-✅ Cuenta los registros en cada state (1 + 1 = 2 total)
-✅ Migra el registro del state reciente al antiguo
-✅ Verifica que el state antiguo ahora tiene 2 registros
-✅ Elimina el state reciente (vacío después de la migración)
-✅ Crea índice único para prevenir futuros duplicados
-✅ Registra todo el proceso con PRINT statements
-¿Listo para aplicarlo? Te recomiendo:
-✅ Probar en desarrollo primero
-✅ Hacer backup de producción
-✅ Aplicar en horario de bajo tráfico
-✅ Validar con los queries que te di
+.requester-name,
+.requestee-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.info-request-time {
+    color: #64748b;
+    font-size: 13px;
+}
+
+/* Colores según urgencia */
+.urgency-low {
+    border-left-color: #22c55e;
+    background-color: #f0fdf4;
+}
+.urgency-low .info-request-dot {
+    background-color: #22c55e;
+}
+
+.urgency-medium {
+    border-left-color: #eab308;
+    background-color: #fefce8;
+}
+.urgency-medium .info-request-dot {
+    background-color: #eab308;
+}
+
+.urgency-high {
+    border-left-color: #ef4444;
+    background-color: #fef2f2;
+}
+.urgency-high .info-request-dot {
+    background-color: #ef4444;
+}
