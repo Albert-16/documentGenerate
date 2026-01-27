@@ -1,81 +1,15 @@
-@if (hasRequestedMoreInfo && StatusName == "En revisión")
+private string GetInfoRequestRelativeTime()
 {
-    <div class="info-request-indicator @GetInfoRequestUrgencyClass()">
-        <div class="info-request-content">
-            <div class="info-request-dot"></div>
-            <div class="info-request-text">
-                <span class="requester-name">@lastInfoRequestedBy</span>
-                ha solicitado más información a
-                <span class="requestee-name">@ApprovalRequest.ApprovalsUserAuto.User_name</span>
-                <span class="info-request-time">• @GetInfoRequestRelativeTime()</span>
-            </div>
-        </div>
-    </div>
-}
-
-
-
-
-
-.info-request-indicator {
-    margin: 12px 0;
-    padding: 12px 16px;
-    border-radius: 8px;
-    border-left: 4px solid;
-    transition: all 0.2s ease;
-}
-
-.info-request-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.info-request-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.info-request-text {
-    font-size: 14px;
-    color: #475569;
-    line-height: 1.4;
-}
-
-.requester-name,
-.requestee-name {
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.info-request-time {
-    color: #64748b;
-    font-size: 13px;
-}
-
-/* Colores según urgencia */
-.urgency-low {
-    border-left-color: #22c55e;
-    background-color: #f0fdf4;
-}
-.urgency-low .info-request-dot {
-    background-color: #22c55e;
-}
-
-.urgency-medium {
-    border-left-color: #eab308;
-    background-color: #fefce8;
-}
-.urgency-medium .info-request-dot {
-    background-color: #eab308;
-}
-
-.urgency-high {
-    border-left-color: #ef4444;
-    background-color: #fef2f2;
-}
-.urgency-high .info-request-dot {
-    background-color: #ef4444;
+    if (infoRequestData == null) return string.Empty;
+    
+    var timeSpan = DateTime.Now - infoRequestData.RequestedAt;
+    
+    if (timeSpan.TotalMinutes < 1)
+        return "hace unos segundos";
+    if (timeSpan.TotalMinutes < 60)
+        return $"hace {(int)timeSpan.TotalMinutes} minuto{((int)timeSpan.TotalMinutes != 1 ? "s" : "")}";
+    if (timeSpan.TotalHours < 24)
+        return $"hace {(int)timeSpan.TotalHours} hora{((int)timeSpan.TotalHours != 1 ? "s" : "")}";
+    
+    return $"hace {(int)timeSpan.TotalDays} día{((int)timeSpan.TotalDays != 1 ? "s" : "")}";
 }
