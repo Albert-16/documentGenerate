@@ -1,64 +1,29 @@
-.info-request-indicator {
-    margin: 12px 0;
-    padding: 12px 16px;
-    border-radius: 8px;
-    border-left: 4px solid;
-    transition: all 0.2s ease;
-}
+private async Task SaveInfoRequest(InfoRequestEventArgs args)
+{
+    try
+    {
+        // Crear el JSON con la información
+        var infoRequestJson = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            RequestedBy = args.RequestedBy,
+            RequestedTo = args.RequestedTo,
+            RequestedAt = args.RequestedAt
+        });
 
-.info-request-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+        var requestUpdateInput = new UpdateRequestInput
+        {
+            Request_id = Request.Base_id,
+            Request_state_description = infoRequestJson
+        };
 
-.info-request-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.info-request-text {
-    font-size: 14px;
-    color: #475569;
-    line-height: 1.4;
-}
-
-.requester-name,
-.requestee-name {
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.info-request-time {
-    color: #64748b;
-    font-size: 13px;
-}
-
-/* Verde - menos de 1 día */
-.urgency-low {
-    border-left-color: #22c55e;
-    background-color: #f0fdf4;
-}
-.urgency-low .info-request-dot {
-    background-color: #22c55e;
-}
-
-/* Amarillo - 1-2 días */
-.urgency-medium {
-    border-left-color: #eab308;
-    background-color: #fefce8;
-}
-.urgency-medium .info-request-dot {
-    background-color: #eab308;
-}
-
-/* Rojo - más de 2 días */
-.urgency-high {
-    border-left-color: #ef4444;
-    background-color: #fef2f2;
-}
-.urgency-high .info-request-dot {
-    background-color: #ef4444;
+        var result = await _manageAdmin.UpdateRequestPartial.ExecuteAsync(input: requestUpdateInput);
+        var data = result.Data.UpdateRequestPartialHelper;
+        
+        // Actualizar localmente
+        Request.Request_state_description = infoRequestJson;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(ex.Message);
+    }
 }
